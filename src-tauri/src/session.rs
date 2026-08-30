@@ -49,6 +49,21 @@
 //!   handed to the engine, canceling would need whisper.cpp abort-callback
 //!   plumbing to interrupt in-flight inference. Not worth that complexity
 //!   for a multi-second window; Escape during `Transcribing` is a no-op.
+//!
+//! **Phase 4: system-audio capture** shares the same `segment_worker` (and
+//! therefore the same engine/grammar/injection/history pipeline) as mic
+//! dictation, per Section 9, but is its own toggle (`system_audio_active`,
+//! a plain bool) rather than a variant of `Phase` — the two capture sources
+//! are mutually exclusive (starting one while the other is active is
+//! ignored, logged, not queued) but otherwise independent. It reuses
+//! `Phase::Transcribing` for its own post-stop "wait for the final segment,
+//! then hide the pill" bookkeeping rather than inventing a parallel state
+//! machine for what's the same wait. System-audio does not get its own
+//! Escape-cancel flow — Section 7's cancel countdown was specified for
+//! "recording" generically without calling out system-audio, and adding a
+//! second cancel path without the plan naming one wasn't judged worth it;
+//! stopping via the toggle hotkey is the only way to end a system-audio
+//! capture in this version.
 
 use std::future::pending;
 use std::sync::Arc;
@@ -61,6 +76,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::cancel::CancelStateMachine;
 use crate::capture::mic::{CaptureError, MicCapture};
+use crate::capture::system_audio::{SystemAudioCapture, SystemAudioCaptureError};
 use crate::engine::{TextProcessor, TranscriptionEngine};
 use crate::history::{HistoryEntry, HistoryStore};
 use crate::hotkey::HotkeyMode;
@@ -189,6 +205,86 @@ fn spawn_capture_actor(at_cap_tx: mpsc::UnboundedSender<CaptureAtCap>) -> Captur
     CaptureHandle { tx: cmd_tx }
 }
 
+// --- System-audio actor: same shape as the mic capture actor above.
+// `SystemAudioCapture` is technically `Send` (raw pointers only, no
+// `cpal::Stream`-style internals), but `start()`/`stop()` still *block* the
+// calling thread — potentially for however long a Screen Recording
+// permission dialog takes to resolve — so they still don't belong on a
+// tokio worker thread. A second small actor, not a generic one shared with
+// mic's, since the two capture types have different concrete error types
+// and there are only ever going to be two of these (Section 9's "shares
+// the downstream pipeline" is about the segment_worker below, not this).
+
+enum SystemAudioCommand {
+    Start(oneshot::Sender<Result<(), SystemAudioCaptureError>>),
+    Stop(oneshot::Sender<Vec<f32>>),
+}
+
+struct SystemAudioAtCap;
+
+struct SystemAudioHandle {
+    tx: std::sync::mpsc::Sender<SystemAudioCommand>,
+}
+
+impl SystemAudioHandle {
+    async fn start(&self) -> Result<(), SystemAudioCaptureError> {
+        let (tx, rx) = oneshot::channel();
+        if self.tx.send(SystemAudioCommand::Start(tx)).is_err() {
+            return Err(SystemAudioCaptureError::StartFailed(
+                "system-audio actor thread is gone".into(),
+            ));
+        }
+        rx.await.unwrap_or(Err(SystemAudioCaptureError::StartFailed(
+            "system-audio actor thread dropped the response channel".into(),
+        )))
+    }
+
+    async fn stop(&self) -> Vec<f32> {
+        let (tx, rx) = oneshot::channel();
+        if self.tx.send(SystemAudioCommand::Stop(tx)).is_err() {
+            return Vec::new();
+        }
+        rx.await.unwrap_or_default()
+    }
+}
+
+fn spawn_system_audio_actor(
+    at_cap_tx: mpsc::UnboundedSender<SystemAudioAtCap>,
+) -> SystemAudioHandle {
+    let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<SystemAudioCommand>();
+
+    std::thread::spawn(move || {
+        let mut capture = SystemAudioCapture::new();
+        let mut running = false;
+
+        loop {
+            match cmd_rx.recv_timeout(CAP_POLL_INTERVAL) {
+                Ok(SystemAudioCommand::Start(respond)) => {
+                    let result = capture.start();
+                    running = result.is_ok();
+                    let _ = respond.send(result);
+                }
+                Ok(SystemAudioCommand::Stop(respond)) => {
+                    let audio = capture.stop();
+                    running = false;
+                    let _ = respond.send(audio);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if running && capture.is_at_cap() {
+                        running = false;
+                        if at_cap_tx.send(SystemAudioAtCap).is_err() {
+                            break;
+                        }
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+
+    SystemAudioHandle { tx: cmd_tx }
+}
+
 // --- Orchestrator ---
 
 pub fn spawn<R: Runtime>(
@@ -233,6 +329,10 @@ async fn run<R: Runtime>(
     let (at_cap_tx, mut at_cap_rx) = mpsc::unbounded_channel::<CaptureAtCap>();
     let capture = spawn_capture_actor(at_cap_tx);
 
+    let (sa_at_cap_tx, mut sa_at_cap_rx) = mpsc::unbounded_channel::<SystemAudioAtCap>();
+    let system_audio = spawn_system_audio_actor(sa_at_cap_tx);
+    let mut system_audio_active = false;
+
     loop {
         let ticking = matches!(phase, Phase::Listening | Phase::CancelPending);
         let tick = async {
@@ -256,9 +356,35 @@ async fn run<R: Runtime>(
                 let Some(cmd) = cmd else { break };
                 match cmd {
                     SessionCommand::HotkeyPressed(HotkeyMode::SystemAudio) => {
-                        tracing::warn!(
-                            "system-audio hotkey pressed — capture not implemented until Phase 4"
-                        );
+                        if system_audio_active {
+                            tracing::info!("system-audio hotkey pressed — stopping");
+                            let audio = system_audio.stop().await;
+                            system_audio_active = false;
+                            phase = Phase::Transcribing; // reuses the mic Phase's Transcribing/done handling
+                            emit_state(&app, "transcribing");
+                            let (done_tx, done_rx) = oneshot::channel();
+                            let _ = segment_tx.send(SegmentJob { audio, done_tx: Some(done_tx) });
+                            final_done_rx = Some(done_rx);
+                        } else if phase != Phase::Idle {
+                            tracing::debug!(
+                                "system-audio hotkey ignored — mic dictation is active"
+                            );
+                        } else {
+                            tracing::info!("system-audio hotkey pressed — starting");
+                            match system_audio.start().await {
+                                Ok(()) => {
+                                    system_audio_active = true;
+                                    show_pill(&app);
+                                }
+                                Err(e) => tracing::error!(
+                                    error = %e,
+                                    "failed to start system-audio capture"
+                                ),
+                            }
+                        }
+                    }
+                    SessionCommand::HotkeyPressed(HotkeyMode::MicDictation) if system_audio_active => {
+                        tracing::debug!("mic-dictation hotkey ignored — system-audio capture is active");
                     }
                     SessionCommand::HotkeyPressed(HotkeyMode::MicDictation) => match phase {
                         Phase::Idle => {
@@ -314,6 +440,25 @@ async fn run<R: Runtime>(
                     } else {
                         phase = Phase::Idle;
                         unregister_escape(&app);
+                    }
+                }
+            }
+            sa_at_cap = sa_at_cap_rx.recv() => {
+                if sa_at_cap.is_some() && system_audio_active {
+                    let audio = system_audio.stop().await;
+                    emit_state(&app, "transcribing");
+                    let _ = segment_tx.send(SegmentJob { audio, done_tx: None });
+                    match system_audio.start().await {
+                        Ok(()) => {
+                            show_pill(&app);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                error = %e,
+                                "failed to restart system-audio capture after cap"
+                            );
+                            system_audio_active = false;
+                        }
                     }
                 }
             }
