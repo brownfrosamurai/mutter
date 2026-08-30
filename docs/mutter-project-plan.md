@@ -353,10 +353,11 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   - Surfaced by: Architecture Issue 1 — single-trait signature can't serve both transcription and text-cleanup
   - Files: Section 10
   - Verify: trait definitions compile with both a `WhisperEngine` (TranscriptionEngine) and a cleanup implementation (TextProcessor) satisfying distinct signatures
-- [ ] **T2 (P1, human: ~1hr / CC: ~10min)** — release/signing — Enable Ed25519 update signature verification in `tauri-plugin-updater`
+- [x] **T2 (P1, human: ~1hr / CC: ~10min)** — release/signing — Enable Ed25519 update signature verification in `tauri-plugin-updater`
   - Surfaced by: Architecture Issue 2 — unverified auto-update is a supply-chain gap for a mic/screen-access background app
   - Files: Section 11
   - Verify: an update package with an invalid/missing signature is rejected in a manual test
+  - **Done 2026-08-30** (the verification mechanism; distribution activation still open — see CLAUDE.md): real Ed25519 keypair generated (`~/.mutter-signing/`, outside the repo), public key pinned in `tauri.conf.json`. Manually verified both directions using `minisign-verify` (the same crate `tauri-plugin-updater` uses internally) against a real signed `.dmg`: a valid signature verifies OK, and a one-byte-tampered copy of the same file correctly fails verification. `plugins.updater.active` stays `false` and `endpoints` stays empty — there's no GitHub remote on this repo yet, so there's nowhere real to point an update manifest at; that's Section 12 distribution work, not this task.
 - [ ] **T3 (P2, human: ~1-2hr / CC: ~15min)** — core/ffi — Wrap whisper-rs and ScreenCaptureKit-bridge calls in `catch_unwind`
   - Surfaced by: Architecture Issue 3 — three native-binding surfaces with no crash isolation
   - Files: Section 3
