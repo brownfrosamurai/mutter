@@ -55,12 +55,8 @@ impl ModelTier {
 
 /// `~/Library/Application Support/Mutter/models/`. Created on first use.
 fn models_dir() -> Result<PathBuf, EngineError> {
-    let home =
-        std::env::var("HOME").map_err(|_| EngineError::ModelNotLoaded("$HOME not set".into()))?;
-    let dir = PathBuf::from(home).join("Library/Application Support/Mutter/models");
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| EngineError::ModelNotLoaded(format!("could not create models dir: {e}")))?;
-    Ok(dir)
+    crate::paths::app_support_subdir("models")
+        .map_err(|e| EngineError::ModelNotLoaded(format!("could not create models dir: {e}")))
 }
 
 /// Download `tier`'s model file via `curl` if it isn't already on disk.

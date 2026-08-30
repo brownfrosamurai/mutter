@@ -5,6 +5,7 @@ pub mod history;
 pub mod hotkey;
 pub mod injection;
 pub mod logging;
+pub mod paths;
 pub mod permissions;
 
 pub fn run() {
