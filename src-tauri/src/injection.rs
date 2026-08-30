@@ -174,7 +174,8 @@ fn clipboard_fallback(text: &str) -> Result<(), InjectionError> {
         ));
     }
 
-    post_cmd_v().map_err(|e| InjectionError::FallbackFailed(format!("synthetic paste failed: {e}")))?;
+    post_cmd_v()
+        .map_err(|e| InjectionError::FallbackFailed(format!("synthetic paste failed: {e}")))?;
 
     // Give the target app a moment to read the pasteboard before it's
     // swapped back — paste is not synchronous from this process's view.

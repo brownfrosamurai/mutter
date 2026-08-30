@@ -23,12 +23,16 @@
 
 use std::ffi::{c_char, c_void, CStr};
 use std::os::raw::c_int;
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 pub const MAX_DURATION_SECS: u64 = 300;
 const SAMPLE_RATE: i32 = 16_000;
 const CHANNEL_COUNT: i32 = 1;
-const CAP_SAMPLES: usize = MAX_DURATION_SECS as usize * SAMPLE_RATE as usize * CHANNEL_COUNT as usize;
+const CAP_SAMPLES: usize =
+    MAX_DURATION_SECS as usize * SAMPLE_RATE as usize * CHANNEL_COUNT as usize;
 
 #[repr(C)]
 struct MutterSckCapture {
@@ -77,7 +81,10 @@ extern "C" fn on_samples_trampoline(samples: *const f32, count: usize, user_data
     if state.at_cap.load(Ordering::Relaxed) {
         return;
     }
-    let mut buf = state.samples.lock().expect("system-audio buffer lock poisoned");
+    let mut buf = state
+        .samples
+        .lock()
+        .expect("system-audio buffer lock poisoned");
     if buf.len() >= CAP_SAMPLES {
         state.at_cap.store(true, Ordering::Relaxed);
         return;
@@ -201,7 +208,10 @@ impl SystemAudioCapture {
             return Vec::new();
         };
         let samples = std::mem::take(
-            &mut *state.samples.lock().expect("system-audio buffer lock poisoned"),
+            &mut *state
+                .samples
+                .lock()
+                .expect("system-audio buffer lock poisoned"),
         );
         samples
     }

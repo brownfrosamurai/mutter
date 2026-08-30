@@ -99,7 +99,9 @@ fn get_history_page(
     state: tauri::State<Option<Arc<history::HistoryStore>>>,
 ) -> Result<Vec<HistoryEntryDto>, String> {
     let store = state.inner().as_ref().ok_or("history store unavailable")?;
-    let rows = store.list_page(page, page_size).map_err(|e| e.to_string())?;
+    let rows = store
+        .list_page(page, page_size)
+        .map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
         .map(|e| HistoryEntryDto {

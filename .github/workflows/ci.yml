@@ -1,13 +1,20 @@
 name: CI
 
-# STUB — filled in properly at Phase 7 (Production hardening) per
-# docs/mutter-project-plan.md Section 11/15. At scaffold time this just
-# runs cargo check/test on push so the repo isn't silently red from day one.
+# Phase 7 (Production hardening, docs/mutter-project-plan.md Section 11/15):
+# check/test/clippy/fmt now run on every push — clippy and fmt were verified
+# clean against the real Phase 0-5 codebase before being made a required gate
+# here (not added speculatively against code that didn't exist yet).
 #
-# Phase 7 additions still needed:
-#   - ad-hoc code signing + notarization-deferred build
-#   - Ed25519 update-signature verification test
-#   - the full test matrix from docs/mutter-project-plan.md Section 11
+# Phase 7 items still open, deliberately not faked here:
+#   - ad-hoc code signing + notarization-deferred build (needs a real signing
+#     identity — see CLAUDE.md's "Stable ad-hoc signing identity" note)
+#   - Ed25519 update-signature verification test (no update manifest/keys
+#     exist yet — tauri-plugin-updater is a dependency but inactive in
+#     tauri.conf.json)
+#   - an integration test running fixture audio through the full pipeline
+#     per registered engine (Section 11) — needs a real, checked-in audio
+#     fixture and a downloaded model, deliberately not added as a CI-blocking
+#     step given the ~500MB model download that would require
 
 on:
   push:
@@ -23,6 +30,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -32,9 +41,17 @@ jobs:
             src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
       - name: cargo check
         working-directory: src-tauri
         run: cargo check --all-features
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: cargo test
         working-directory: src-tauri

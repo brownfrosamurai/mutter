@@ -94,9 +94,8 @@ fn ensure_model_downloaded(tier: ModelTier) -> Result<PathBuf, EngineError> {
         )));
     }
 
-    std::fs::rename(&tmp_path, &path).map_err(|e| {
-        EngineError::ModelNotLoaded(format!("could not finalize model file: {e}"))
-    })?;
+    std::fs::rename(&tmp_path, &path)
+        .map_err(|e| EngineError::ModelNotLoaded(format!("could not finalize model file: {e}")))?;
     Ok(path)
 }
 
@@ -228,7 +227,9 @@ mod tests {
     #[test]
     fn download_url_points_at_the_right_filename() {
         assert!(ModelTier::Small.download_url().ends_with("ggml-small.bin"));
-        assert!(ModelTier::Medium.download_url().ends_with("ggml-medium.bin"));
+        assert!(ModelTier::Medium
+            .download_url()
+            .ends_with("ggml-medium.bin"));
     }
 
     // Real model loading + inference needs a ~500MB download and a real

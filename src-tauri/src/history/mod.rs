@@ -88,7 +88,8 @@ impl HistoryStore {
             None
         };
 
-        let mut conn = Connection::open(db_path).map_err(|e| HistoryError::Database(e.to_string()))?;
+        let mut conn =
+            Connection::open(db_path).map_err(|e| HistoryError::Database(e.to_string()))?;
 
         if let Err(e) = migrations::migrations().to_latest(&mut conn) {
             tracing::error!(error = %e, "history db migration failed");
@@ -133,7 +134,8 @@ impl HistoryStore {
         )
         .map_err(|e| HistoryError::Database(e.to_string()))?;
 
-        tx.commit().map_err(|e| HistoryError::Database(e.to_string()))
+        tx.commit()
+            .map_err(|e| HistoryError::Database(e.to_string()))
     }
 
     /// Paginated, most-recent-first — never loads the full table at once
@@ -296,10 +298,15 @@ mod tests {
 
         store.insert(&sample_entry_in("hi", 1.0, "en")).unwrap();
         store.insert(&sample_entry_in("hi", 1.0, "en")).unwrap();
-        store.insert(&sample_entry_in("bonjour", 1.0, "fr")).unwrap();
+        store
+            .insert(&sample_entry_in("bonjour", 1.0, "fr"))
+            .unwrap();
 
         let breakdown = store.language_breakdown().unwrap();
-        assert_eq!(breakdown, vec![("en".to_string(), 2), ("fr".to_string(), 1)]);
+        assert_eq!(
+            breakdown,
+            vec![("en".to_string(), 2), ("fr".to_string(), 1)]
+        );
 
         std::fs::remove_file(&path).ok();
     }
@@ -320,7 +327,10 @@ mod tests {
 
         // 10 words in 30 seconds (0.5 min) => 20 WPM for this entry.
         store
-            .insert(&sample_entry("one two three four five six seven eight nine ten", 30.0))
+            .insert(&sample_entry(
+                "one two three four five six seven eight nine ten",
+                30.0,
+            ))
             .unwrap();
 
         let metrics = store.metrics(DEFAULT_TYPING_WPM).unwrap();

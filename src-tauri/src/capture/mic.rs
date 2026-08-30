@@ -124,9 +124,7 @@ impl MicCapture {
         let Some(state) = self.state.take() else {
             return Vec::new();
         };
-        let raw = std::mem::take(
-            &mut *state.samples.lock().expect("capture buffer lock poisoned"),
-        );
+        let raw = std::mem::take(&mut *state.samples.lock().expect("capture buffer lock poisoned"));
         let mono = downmix_to_mono(&raw, state.source_channels);
         resample_linear(&mono, state.source_sample_rate, TARGET_SAMPLE_RATE)
     }

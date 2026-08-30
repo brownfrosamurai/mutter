@@ -206,7 +206,13 @@ pub fn spawn<R: Runtime>(
     // "entered" the way a bare `tokio::spawn` requires ("there is no
     // reactor running" otherwise). Tauri's wrapper spawns onto the runtime
     // it manages internally regardless of the calling context.
-    tauri::async_runtime::spawn(segment_worker(engine, grammar, history, engine_name, segment_rx));
+    tauri::async_runtime::spawn(segment_worker(
+        engine,
+        grammar,
+        history,
+        engine_name,
+        segment_rx,
+    ));
     tauri::async_runtime::spawn(run(app, tx.clone(), rx, segment_tx));
 
     SessionHandle { tx }
