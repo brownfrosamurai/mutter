@@ -97,6 +97,7 @@ The pill's appearance/dismissal should feel like it materializes and dissolves, 
 
 - **Pill:** single row, icon-left, status-text-right, nothing else. No settings, no branding, no chrome.
 - **Dashboard:** a settings-window layout, not a dashboard-app layout — a floating icon sidebar (not top-tabs) navigates Metrics / History / Settings plus Quit, each section simple enough to fit without scrolling on a laptop screen where reasonable. The Metrics panel itself is stat tiles (sessions/words/time saved), a per-language breakdown (name + proportional bar), and a latency table (stage × p50/p95/samples) — this is the one section with real layout density, everything else stays a single simple list.
+- **The sidebar rail is a pill, not a rail.** It's sized to its own content (nav icons + a divider + Quit) and vertically centered next to the full-height content card, not stretched to the window's height — a short floating capsule, consistent with `--radius-pill` and the "widget, not a big desktop app" framing above, rather than a conventional full-height app sidebar. The transparent margin this leaves above/below it is intentional (the window is genuinely transparent there, same mechanism as the Pill surface) — don't "fix" it by giving the sidebar a full-height background.
 - **No dock icon, no permanent window.** Both surfaces exist only when summoned (pill: during a recording cycle; dashboard: when opened from the menu-bar icon).
 
 ## What this file is not

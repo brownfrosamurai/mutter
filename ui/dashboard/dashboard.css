@@ -51,7 +51,9 @@ body {
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
 #shell {
@@ -62,14 +64,20 @@ body {
   padding: var(--space-3);
 }
 
-/* Floating icon nav rail */
+/* Floating icon nav rail — a true pill/capsule sized to its own content
+   (icons + quit), not stretched to the window's full height like the main
+   content card. Vertically centered within #shell (align-self overrides
+   the parent's stretch) so the transparent margin above/below it reads as
+   a floating widget, not a layout gap — see ../../DESIGN.md's "widget, not
+   a huge desktop application" framing. */
 #sidebar {
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-self: center;
   gap: var(--space-2);
   width: 44px;
-  padding: var(--space-2) 0;
+  padding: var(--space-3) 0;
   border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
@@ -103,8 +111,21 @@ body {
   color: #fff;
 }
 
+.nav-btn:focus-visible,
+.history-copy-btn:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 2px;
+}
+
+/* Was `flex: 1` to push Quit to the bottom of a full-height rail — now that
+   the rail is content-sized, a small fixed gap plus a hairline divider
+   keeps Quit visually set apart from navigation instead of just butting up
+   against Settings. */
 .nav-spacer {
-  flex: 1;
+  width: 20px;
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--glass-border);
 }
 
 .nav-btn-quit:hover {
