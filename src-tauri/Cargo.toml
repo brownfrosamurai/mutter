@@ -1,0 +1,59 @@
+[package]
+name = "mutter"
+version = "0.1.0"
+description = "Local-first, multi-language speech-to-text dictation for macOS"
+edition = "2021"
+rust-version = "1.75"
+
+# Named distinctly from the binary target below — standard Tauri 2
+# convention (`{package}_lib`), since a mobile build target needs the
+# library as a cdylib/staticlib and can't share a name with the bin target.
+[lib]
+name = "mutter_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+path = "src/lib.rs"
+
+# See https://tauri.app/v1/api/config/#build for build script config
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Audio capture
+cpal = "0.15"
+
+# Speech-to-text engine (whisper.cpp bindings) — integration path (whisper-rs
+# bindings vs. CLI shell-out vs. FFI) is an open Phase 0 spike, see
+# docs/mutter-project-plan.md Section 14. Pinning whisper-rs here as the
+# default assumption; revisit after the spike.
+whisper-rs = "0.12"
+
+# Local history storage
+rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite_migration = "1"
+
+# Logging (local-only, metadata-only — never audio/transcript content)
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "1"
+
+# Async trait support (stable async fn in traits doesn't yet support
+# object-safety the way this codebase needs it — revisit if/when it does)
+async-trait = "0.1"
+
+[features]
+# Empty for now — custom-protocol is added automatically by tauri-build in
+# release configs; no manual feature flags needed at scaffold time.
+default = []
+
+[[bin]]
+name = "mutter"
+path = "src/main.rs"

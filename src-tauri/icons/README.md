@@ -1,0 +1,1 @@
+Placeholder icons — solid `#0A84FF` (the DESIGN.md `--accent` token) squares generated programmatically, not real artwork. Enough for `cargo check`/`cargo tauri build` to succeed; replace with real app icons before any release. `icon-1024.png` is the source; the rest were derived from it via `sips`/`iconutil`.

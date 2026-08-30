@@ -1,0 +1,41 @@
+name: CI
+
+# STUB — filled in properly at Phase 7 (Production hardening) per
+# docs/mutter-project-plan.md Section 11/15. At scaffold time this just
+# runs cargo check/test on push so the repo isn't silently red from day one.
+#
+# Phase 7 additions still needed:
+#   - ad-hoc code signing + notarization-deferred build
+#   - Ed25519 update-signature verification test
+#   - the full test matrix from docs/mutter-project-plan.md Section 11
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check --all-features
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --all-features

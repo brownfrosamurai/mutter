@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Mutter</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <!--
+    Settings-window layout, not a dashboard-app layout — see ../../DESIGN.md
+    "Layout principles". Top-tab navigation between Metrics / History /
+    Settings, each simple enough to fit without scrolling where reasonable.
+
+    STUB: static shell only, no live data — Phase 5 (dashboard) work.
+  -->
+  <div id="app" class="glass-panel">
+    <nav id="tabs">
+      <button class="tab active" data-tab="metrics">Metrics</button>
+      <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <main id="panels">
+      <section id="panel-metrics" class="panel active">
+        <div class="metric-row">
+          <div class="metric">
+            <div class="metric-value" id="metric-time-saved">—</div>
+            <div class="metric-label">Time saved</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="metric-total">—</div>
+            <div class="metric-label">Total transcriptions</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="metric-wpm">—</div>
+            <div class="metric-label">Avg. WPM</div>
+          </div>
+        </div>
+        <p class="hint">No data yet — metrics populate once the core loop (Phase 1) is implemented.</p>
+      </section>
+
+      <section id="panel-history" class="panel">
+        <ul id="history-list"></ul>
+        <p class="hint">Empty — local history store (Phase 2) not yet implemented.</p>
+      </section>
+
+      <section id="panel-settings" class="panel">
+        <div class="setting-row">
+          <label>Mic-dictation hotkey</label>
+          <span class="hint">Not yet configurable (Phase 1)</span>
+        </div>
+        <div class="setting-row">
+          <label>System-audio hotkey</label>
+          <span class="hint">Not yet configurable (Phase 4)</span>
+        </div>
+        <div class="setting-row">
+          <label>Permissions</label>
+          <span class="hint">Mic / Accessibility / Screen Recording — not yet wired (Phase 1/4)</span>
+        </div>
+        <div class="setting-row">
+          <label>Engine</label>
+          <span class="hint">Whisper vs. Apple Speech — pending Phase 0 benchmark</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

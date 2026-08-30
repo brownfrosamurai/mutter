@@ -1,0 +1,133 @@
+/* Dashboard/Settings window — see ../../DESIGN.md for the full token reference. */
+
+:root {
+  --glass-bg: rgba(28, 28, 30, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --accent: #0a84ff;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-panel: 14px;
+  --radius-small: 8px;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 20px;
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-base: 200ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+  color: var(--text-primary);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+#tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--duration-base) var(--ease-standard);
+}
+
+.tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+#panels {
+  flex: 1;
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
+
+.metric-row {
+  display: flex;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+.metric-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.metric-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: var(--text-sm);
+}
+
+.hint {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+#history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+}

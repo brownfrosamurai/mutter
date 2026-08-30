@@ -1,0 +1,28 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Tauri build output
+/src-tauri/target/
+/src-tauri/gen/
+
+# Node (if any build tooling is added later)
+node_modules/
+npm-debug.log*
+
+# macOS
+.DS_Store
+
+# Local app data / models (never commit model weights)
+*.bin
+*.gguf
+/models/
+
+# Editor
+.vscode/
+.idea/
+
+# Local history DB (never commit user data)
+*.sqlite
+*.sqlite3

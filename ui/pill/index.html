@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Mutter</title>
+  <link rel="stylesheet" href="pill.css" />
+</head>
+<body>
+  <!--
+    States: loading | listening | transcribing | canceling | done
+    Driven by the data-state attribute on #pill, set from pill.js in
+    response to Tauri events emitted by the Rust backend. See
+    ../../DESIGN.md for the visual spec and ../../CLAUDE.md for the
+    architecture this connects to (hotkey.rs / cancel.rs).
+
+    STUB: static markup only, no live backend wiring yet — Phase 1 work.
+  -->
+  <div id="pill" class="glass-panel" data-state="listening">
+    <span id="pill-icon" class="pill-icon" aria-hidden="true"></span>
+    <span id="pill-status" class="pill-status">Listening…</span>
+    <span id="pill-countdown" class="pill-countdown" hidden></span>
+  </div>
+
+  <script src="pill.js"></script>
+</body>
+</html>
