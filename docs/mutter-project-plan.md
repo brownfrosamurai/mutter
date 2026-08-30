@@ -349,51 +349,61 @@ For each new codepath, one realistic production failure and its current coverage
 Synthesized from this review's findings. Each task derives from a specific
 finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~20min / CC: ~5min)** — core/engine — Split `TranscriptionEngine` into two traits (audio→text) and `TextProcessor` (text→text)
+- [x] **T1 (P1, human: ~20min / CC: ~5min)** — core/engine — Split `TranscriptionEngine` into two traits (audio→text) and `TextProcessor` (text→text)
   - Surfaced by: Architecture Issue 1 — single-trait signature can't serve both transcription and text-cleanup
   - Files: Section 10
   - Verify: trait definitions compile with both a `WhisperEngine` (TranscriptionEngine) and a cleanup implementation (TextProcessor) satisfying distinct signatures
+  - **Done** — `engine/mod.rs` defines both traits separately; `WhisperEngine` implements `TranscriptionEngine`, `RuleBasedCleanup` implements `TextProcessor`. Checkbox was just never ticked at implementation time — confirmed via the 2026-08-30 completion audit.
 - [x] **T2 (P1, human: ~1hr / CC: ~10min)** — release/signing — Enable Ed25519 update signature verification in `tauri-plugin-updater`
   - Surfaced by: Architecture Issue 2 — unverified auto-update is a supply-chain gap for a mic/screen-access background app
   - Files: Section 11
   - Verify: an update package with an invalid/missing signature is rejected in a manual test
   - **Done 2026-08-30** (the verification mechanism; distribution activation still open — see CLAUDE.md): real Ed25519 keypair generated (`~/.mutter-signing/`, outside the repo), public key pinned in `tauri.conf.json`. Manually verified both directions using `minisign-verify` (the same crate `tauri-plugin-updater` uses internally) against a real signed `.dmg`: a valid signature verifies OK, and a one-byte-tampered copy of the same file correctly fails verification. `plugins.updater.active` stays `false` and `endpoints` stays empty — there's no GitHub remote on this repo yet, so there's nowhere real to point an update manifest at; that's Section 12 distribution work, not this task.
-- [ ] **T3 (P2, human: ~1-2hr / CC: ~15min)** — core/ffi — Wrap whisper-rs and ScreenCaptureKit-bridge calls in `catch_unwind`
+- [x] **T3 (P2, human: ~1-2hr / CC: ~15min)** — core/ffi — Wrap whisper-rs and ScreenCaptureKit-bridge calls in `catch_unwind`
   - Surfaced by: Architecture Issue 3 — three native-binding surfaces with no crash isolation
   - Files: Section 3
   - Verify: a simulated panic inside a wrapped call surfaces as a recoverable `EngineError`, not an app crash
-- [ ] **T4 (P2, human: ~1hr / CC: ~10min)** — core/permissions — Implement generic `PermissionGate<T>` shared by mic/Accessibility/system-audio
+  - **Done** — `catch_unwind` wraps the native calls in `engine/whisper.rs`, `injection.rs`, and `capture/system_audio.rs`. Checkbox was never ticked; confirmed via the 2026-08-30 completion audit.
+- [x] **T4 (P2, human: ~1hr / CC: ~10min)** — core/permissions — Implement generic `PermissionGate<T>` shared by mic/Accessibility/system-audio
   - Surfaced by: Code Quality Issue 4 — DRY violation across three near-identical permission state machines
   - Files: Section 11
   - Verify: one test suite covers all three instantiations
-- [ ] **T5 (P2, human: ~30min / CC: ~5min)** — core/engine — Define typed `EngineError` enum shared by `TranscriptionEngine` and `TextProcessor`
+  - **Done** — `permissions.rs`'s `PermissionGate<T>` is one generic implementation, instantiated for `Mic`/`Accessibility`/`SystemAudio`, wired to real OS APIs (`AXIsProcessTrusted`, `CGPreflightScreenCaptureAccess`, an AVFoundation shim), all three now confirmed **Granted** live on the dev machine.
+- [x] **T5 (P2, human: ~30min / CC: ~5min)** — core/engine — Define typed `EngineError` enum shared by `TranscriptionEngine` and `TextProcessor`
   - Surfaced by: Code Quality Issue 5 — untyped engine errors contradict the plan's own recoverable-error-state precedent
   - Files: Section 10
   - Verify: each variant (`ModelNotLoaded`, `UnsupportedLanguage`, `InferenceFailed`, `Timeout`) maps to a specific UI message
-- [ ] **T6 (P1, human: ~1hr / CC: ~10min)** — storage/history — Backup-then-migrate with refuse-to-launch on migration failure
+  - **Done** — exactly these four variants exist in `engine/mod.rs`.
+- [x] **T6 (P1, human: ~1hr / CC: ~10min)** — storage/history — Backup-then-migrate with refuse-to-launch on migration failure
   - Surfaced by: Test Issue 6 — no failure path specified for a failed SQLite schema migration
   - Files: Section 11
   - Verify: a simulated migration failure produces a backup file and a recovery screen, not a launch against a broken schema
+  - **Done**, and hardened 2026-08-30 — real recovery window (`ui/recovery/`) verified live against a genuinely corrupted DB; also fixed a bug where a backup was taken on *every* launch, not just failed migrations.
 - [ ] **T7 (P3)** — core/engine — Abort-and-restart in-flight transcription on mid-flight engine change
   - Surfaced by: Test Issue 7 — unspecified behavior when settings change during an in-flight transcription
   - Files: Section 10
   - Verify: changing engine mid-inference aborts and restarts against the new engine
-- [ ] **T8 (P2, human: ~15min / CC: ~2min)** — core/engine — Lazy-load model on first use, keep resident for app lifetime
+  - **Deliberately deferred, user-confirmed 2026-08-30** — meaningless to build/test until a second real `TranscriptionEngine` exists (`AppleSpeechEngine` is still a stub, blocked on the Phase 0 benchmark). Building it against nothing to switch to would be exactly the untested-plumbing failure mode this session already caught once (the whisper `detect_language` bug).
+- [x] **T8 (P2, human: ~15min / CC: ~2min)** — core/engine — Lazy-load model on first use, keep resident for app lifetime
   - Surfaced by: Performance Issue 8 — reload-per-transcription would undercut the blazing-fast requirement
   - Files: Section 6
   - Verify: first transcription pays load latency (shown via the pill's loading state), subsequent ones don't
-- [ ] **T9 (P2, human: ~1-2hr / CC: ~15min)** — ui/dashboard — Paginate activity feed, maintain running aggregates with a manual recompute action
+  - **Done**, and completed 2026-08-30 — the model was already lazy-loaded-and-resident via `OnceCell`, but the pill's "loading" state was never actually wired; `TranscriptionEngine::ensure_ready()` + a `session.rs` call now shows it on the first hand-off only.
+- [x] **T9 (P2, human: ~1-2hr / CC: ~15min)** — ui/dashboard — Paginate activity feed, maintain running aggregates with a manual recompute action
   - Surfaced by: Performance Issue 9 — unbounded history queries won't scale for long-term daily use
   - Files: Section 8
   - Verify: dashboard load time stays flat as history grows past a few thousand rows (simulated)
-- [ ] **T10 (P1, human: ~30min / CC: ~5min)** — core/capture — Auto-transcribe-and-continue at duration cap instead of truncating
+  - **Done** — `history.rs`'s `list_page` is paginated, aggregates are running totals updated on insert, `recompute_aggregates()` is the manual drift-correction action.
+- [x] **T10 (P1, human: ~30min / CC: ~5min)** — core/capture — Auto-transcribe-and-continue at duration cap instead of truncating
   - Surfaced by: Outside voice — 120s cap silently truncated the primary AI-agent-dictation use case
   - Files: Section 3
   - Verify: a recording held past the cap produces multiple inserted segments, not a truncated one
-- [ ] **T11 (P2, human: ~20min / CC: ~5min)** — core/engine — Auto-detect language instead of manual per-language settings switch
+  - **Done**, and a real bug fixed 2026-08-30 — the cap-during-`Phase::CancelPending` case was silently dropping audio (a genuine data-loss bug, not just missing this checkbox); now handled identically to the `Listening` case.
+- [x] **T11 (P2, human: ~20min / CC: ~5min)** — core/engine — Auto-detect language instead of manual per-language settings switch
   - Surfaced by: Outside voice — manual language switching conflicts with blazing-fast widget UX
   - Files: Section 10
   - Verify: dictating in a non-default language produces correct output with no settings change
+  - **Done**, after fixing a critical bug 2026-08-30 — `whisper.rs` was also setting `detect_language(true)`, which per whisper.cpp's own source makes it detect-and-stop rather than detect-then-transcribe. Every real dictation would have silently returned empty text. Fixed and reverified live via the fixture-audio test.
 - [x] **T12 (P1)** — core/capture — Validate terminal text-injection in Phase 2, not deferred to Phase 8
   - Surfaced by: Outside voice — highest-risk integration point (AI-agent REPL dictation) was tested last
   - Files: Section 15
