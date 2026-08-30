@@ -13,12 +13,52 @@
     ../../DESIGN.md for the visual spec and ../../CLAUDE.md for the
     architecture this connects to (hotkey.rs / cancel.rs).
 
+    Visual reference: design-mockup pass matched against three reference
+    screenshots (glass pill states + dashboard). All five states share one
+    markup shape; unused elements are hidden per state via pill.css.
+
     STUB: static markup only, no live backend wiring yet — Phase 1 work.
   -->
   <div id="pill" class="glass-panel" data-state="listening">
-    <span id="pill-icon" class="pill-icon" aria-hidden="true"></span>
-    <span id="pill-status" class="pill-status">Listening…</span>
+    <span id="pill-icon" class="pill-icon" aria-hidden="true">
+      <span class="icon-dot"></span>
+      <span class="icon-spinner"></span>
+      <svg class="icon-mic" viewBox="0 0 16 16" fill="none">
+        <rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="currentColor" />
+        <path d="M3 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        <path d="M8 12.5v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+      </svg>
+    </span>
+
+    <span id="pill-waveform" class="pill-waveform" aria-hidden="true">
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+    </span>
+
+    <span class="pill-text">
+      <span id="pill-status" class="pill-status">Listening…</span>
+      <span id="pill-subtext" class="pill-subtext" hidden></span>
+    </span>
+
+    <span id="pill-timer" class="pill-timer" hidden>0:00</span>
     <span id="pill-countdown" class="pill-countdown" hidden></span>
+
+    <span id="pill-controls" class="pill-controls">
+      <button id="pill-pause" class="pill-btn" type="button" aria-label="Pause">
+        <svg viewBox="0 0 12 12" fill="none">
+          <rect x="2.5" y="1.5" width="2.2" height="9" rx="1" fill="currentColor" />
+          <rect x="7.3" y="1.5" width="2.2" height="9" rx="1" fill="currentColor" />
+        </svg>
+      </button>
+      <button id="pill-cancel" class="pill-btn pill-btn-danger" type="button" aria-label="Cancel">
+        <svg viewBox="0 0 12 12" fill="none">
+          <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </span>
   </div>
 
   <script src="pill.js"></script>

@@ -1,12 +1,16 @@
-/* Dashboard/Settings window — see ../../DESIGN.md for the full token reference. */
+/* Dashboard/Settings window — see ../../DESIGN.md for the full token reference.
+   Layout matched against a reference mockup: floating icon sidebar +
+   content card (stat tiles, per-language bars, latency table). */
 
 :root {
-  --glass-bg: rgba(28, 28, 30, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(20, 20, 20, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.10);
   --glass-highlight: rgba(255, 255, 255, 0.06);
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-primary: rgba(255, 255, 255, 0.94);
+  --text-secondary: rgba(255, 255, 255, 0.48);
   --accent: #0a84ff;
+  --accent-violet: #8b7cf6;
+  --danger: #ff453a;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -17,6 +21,7 @@
 
   --radius-panel: 14px;
   --radius-small: 8px;
+  --radius-pill: 999px;
 
   --text-xs: 11px;
   --text-sm: 13px;
@@ -43,42 +48,88 @@ body {
 
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
+#shell {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  height: 100vh;
+  padding: var(--space-3);
+}
+
+/* Floating icon nav rail */
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 44px;
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
+}
+
+.nav-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nav-btn:hover {
+  color: var(--text-primary);
+}
+
+.nav-btn.active {
+  background: var(--accent-violet);
+  color: #fff;
+}
+
+.nav-spacer {
+  flex: 1;
+}
+
+.nav-btn-quit:hover {
+  color: var(--danger);
+}
+
+/* Main content card */
 #app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  flex: 1;
+  min-width: 0;
   border-radius: var(--radius-panel);
   overflow: hidden;
 }
 
-#tabs {
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) 0;
+#panel-header {
+  padding: var(--space-4) var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--glass-border);
 }
 
-.tab {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  padding: var(--space-2) var(--space-3) var(--space-3);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color var(--duration-base) var(--ease-standard);
-}
-
-.tab.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
+#panel-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
 }
 
 #panels {
@@ -95,23 +146,121 @@ body {
   display: block;
 }
 
-.metric-row {
+/* Stat tiles */
+.stat-row {
   display: flex;
   gap: var(--space-6);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
-.metric-value {
-  font-size: var(--text-lg);
+.stat-label {
+  font-size: var(--text-xs);
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
-.metric-label {
+.stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  margin-top: var(--space-1);
+}
+
+.stat-sub {
   font-size: var(--text-xs);
   color: var(--text-secondary);
   margin-top: var(--space-1);
 }
 
+/* Shared section heading */
+.dash-section {
+  margin-bottom: var(--space-6);
+}
+
+.dash-section h2 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+/* Languages */
+.language-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.language-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.language-name {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.language-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.language-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent-violet);
+}
+
+.language-count {
+  width: 48px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Latency table */
+.latency-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.latency-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.latency-table th:not(:first-child),
+.latency-table td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.latency-table td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.latency-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Settings / history (unchanged from prior stub) */
 .setting-row {
   display: flex;
   justify-content: space-between;

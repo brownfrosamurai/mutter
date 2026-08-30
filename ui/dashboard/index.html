@@ -8,61 +8,122 @@
 <body>
   <!--
     Settings-window layout, not a dashboard-app layout — see ../../DESIGN.md
-    "Layout principles". Top-tab navigation between Metrics / History /
-    Settings, each simple enough to fit without scrolling where reasonable.
+    "Layout principles". Floating icon sidebar navigates Metrics / History /
+    Settings, matched against a reference mockup; native window decorations
+    (tauri.conf.json's `decorations: true` for this window) supply the
+    title bar and traffic lights, so the content card draws neither.
 
     STUB: static shell only, no live data — Phase 5 (dashboard) work.
   -->
-  <div id="app" class="glass-panel">
-    <nav id="tabs">
-      <button class="tab active" data-tab="metrics">Metrics</button>
-      <button class="tab" data-tab="history">History</button>
-      <button class="tab" data-tab="settings">Settings</button>
+  <div id="shell">
+    <nav id="sidebar" class="glass-panel" aria-label="Primary">
+      <button class="nav-btn active" data-tab="metrics" aria-label="Metrics">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="9" width="2.6" height="5" rx="1" fill="currentColor" />
+          <rect x="6.7" y="5" width="2.6" height="9" rx="1" fill="currentColor" />
+          <rect x="11.4" y="2" width="2.6" height="12" rx="1" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="nav-btn" data-tab="history" aria-label="History">
+        <svg viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4" />
+          <path d="M8 4.8V8l2.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        </svg>
+      </button>
+      <button class="nav-btn" data-tab="settings" aria-label="Settings">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M2 4.5h7M11.5 4.5H14M2 8h3M6.5 8H14M2 11.5h9.5M14 11.5h0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          <circle cx="9" cy="4.5" r="1.6" fill="currentColor" />
+          <circle cx="4.5" cy="8" r="1.6" fill="currentColor" />
+          <circle cx="12.5" cy="11.5" r="1.6" fill="currentColor" />
+        </svg>
+      </button>
+      <div class="nav-spacer"></div>
+      <button class="nav-btn nav-btn-quit" id="quit-btn" aria-label="Quit">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M8 2v5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          <path d="M4.6 4.2a5.4 5.4 0 1 0 6.8 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        </svg>
+      </button>
     </nav>
 
-    <main id="panels">
-      <section id="panel-metrics" class="panel active">
-        <div class="metric-row">
-          <div class="metric">
-            <div class="metric-value" id="metric-time-saved">—</div>
-            <div class="metric-label">Time saved</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="metric-total">—</div>
-            <div class="metric-label">Total transcriptions</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value" id="metric-wpm">—</div>
-            <div class="metric-label">Avg. WPM</div>
-          </div>
-        </div>
-        <p class="hint">No data yet — metrics populate once the core loop (Phase 1) is implemented.</p>
-      </section>
+    <div id="app" class="glass-panel">
+      <header id="panel-header">
+        <h1 id="panel-title">Stats</h1>
+      </header>
 
-      <section id="panel-history" class="panel">
-        <ul id="history-list"></ul>
-        <p class="hint">Empty — local history store (Phase 2) not yet implemented.</p>
-      </section>
+      <main id="panels">
+        <section id="panel-metrics" class="panel active">
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-label">Sessions</div>
+              <div class="stat-value" id="metric-sessions">—</div>
+              <div class="stat-sub" id="metric-sessions-sub">No data yet</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Words</div>
+              <div class="stat-value" id="metric-words">—</div>
+              <div class="stat-sub" id="metric-words-sub">No data yet</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Time saved</div>
+              <div class="stat-value" id="metric-time-saved">—</div>
+              <div class="stat-sub" id="metric-time-saved-sub">No data yet</div>
+            </div>
+          </div>
 
-      <section id="panel-settings" class="panel">
-        <div class="setting-row">
-          <label>Mic-dictation hotkey</label>
-          <span class="hint">Not yet configurable (Phase 1)</span>
-        </div>
-        <div class="setting-row">
-          <label>System-audio hotkey</label>
-          <span class="hint">Not yet configurable (Phase 4)</span>
-        </div>
-        <div class="setting-row">
-          <label>Permissions</label>
-          <span class="hint">Mic / Accessibility / Screen Recording — not yet wired (Phase 1/4)</span>
-        </div>
-        <div class="setting-row">
-          <label>Engine</label>
-          <span class="hint">Whisper vs. Apple Speech — pending Phase 0 benchmark</span>
-        </div>
-      </section>
-    </main>
+          <section class="dash-section">
+            <h2>Languages</h2>
+            <div id="language-list" class="language-list">
+              <p class="hint">No data yet.</p>
+            </div>
+          </section>
+
+          <section class="dash-section">
+            <h2>Latency</h2>
+            <table id="latency-table" class="latency-table">
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th>p50</th>
+                  <th>p95</th>
+                  <th>Samples</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="4" class="hint">No data yet — metrics populate once the core loop (Phase 1) is implemented.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </section>
+
+        <section id="panel-history" class="panel">
+          <ul id="history-list"></ul>
+          <p class="hint">Empty — local history store (Phase 2) not yet implemented.</p>
+        </section>
+
+        <section id="panel-settings" class="panel">
+          <div class="setting-row">
+            <label>Mic-dictation hotkey</label>
+            <span class="hint">Not yet configurable (Phase 1)</span>
+          </div>
+          <div class="setting-row">
+            <label>System-audio hotkey</label>
+            <span class="hint">Not yet configurable (Phase 4)</span>
+          </div>
+          <div class="setting-row">
+            <label>Permissions</label>
+            <span class="hint">Mic / Accessibility / Screen Recording — not yet wired (Phase 1/4)</span>
+          </div>
+          <div class="setting-row">
+            <label>Engine</label>
+            <span class="hint">Whisper vs. Apple Speech — pending Phase 0 benchmark</span>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="dashboard.js"></script>

@@ -6,8 +6,8 @@ Two surfaces only. No design system beyond what these two surfaces need — do n
 
 ## Surfaces
 
-1. **The Pill** — floating, always-on-top HUD. Visible only during an active recording/transcribing/canceling cycle. States: `loading` (first use only), `listening`, `transcribing`, `canceling`, `done`.
-2. **Dashboard/Settings window** — opened from the menu-bar icon. Metrics, history, hotkey config, language, engine selection, permissions, Quit.
+1. **The Pill** — floating, always-on-top HUD. Visible only during an active recording/transcribing/canceling cycle. States: `loading` (first use only, text-only), `listening` (mic icon + waveform + elapsed timer + pause/cancel controls, no status text), `transcribing` (spinner + status + model subtext), `canceling` (danger-colored icon + status), `done` (success-colored icon + status). Only one state's elements are visible at a time — see `pill.css`'s per-state rules.
+2. **Dashboard/Settings window** — opened from the menu-bar icon. Metrics, history, hotkey config, language, engine selection, permissions, Quit. Uses the OS's native title bar/traffic lights (`decorations: true` in `tauri.conf.json`) rather than custom-drawn ones — only the Pill draws its own chrome.
 
 Both share the same visual language below. Neither is a "big app window" — see Layout.
 
@@ -17,13 +17,14 @@ Dark-leaning glassmorphism (frosted glass reads better on a translucent dark bas
 
 | Token | Value | Use |
 |---|---|---|
-| `--glass-bg` | `rgba(28, 28, 30, 0.55)` | Base fill behind the blur, both surfaces |
-| `--glass-border` | `rgba(255, 255, 255, 0.12)` | 1px hairline border on every glass panel |
+| `--glass-bg` | `rgba(20, 20, 20, 0.82)` | Base fill behind the blur, both surfaces — darker/more opaque than the first draft, matched against reference mockups |
+| `--glass-border` | `rgba(255, 255, 255, 0.10)` | 1px hairline border on every glass panel |
 | `--glass-highlight` | `rgba(255, 255, 255, 0.06)` | Subtle top-edge inner highlight (linear-gradient), gives the "glass" a light source |
-| `--text-primary` | `rgba(255, 255, 255, 0.92)` | Primary text/icons |
-| `--text-secondary` | `rgba(255, 255, 255, 0.55)` | Secondary text, timestamps, hints |
-| `--accent` | `#0A84FF` | macOS system blue — active states, the listening waveform, primary buttons |
-| `--danger` | `#FF453A` | Cancel countdown, error markers (`[transcription failed]`) |
+| `--text-primary` | `rgba(255, 255, 255, 0.94)` | Primary text/icons |
+| `--text-secondary` | `rgba(255, 255, 255, 0.48)` | Secondary text, timestamps, hints |
+| `--accent` | `#0A84FF` | macOS system blue — transcribing spinner, primary links/buttons |
+| `--accent-violet` | `#8B7CF6` | Mic icon + listening waveform, active sidebar nav icon — kept distinct from `--accent` so "recording" reads differently from "processing" at a glance |
+| `--danger` | `#FF453A` | Cancel state (icon + text), cancel countdown, error markers (`[transcription failed]`) |
 | `--success` | `#30D158` | Done/confirmation state |
 
 No custom color beyond this table without updating it here first.
@@ -95,7 +96,7 @@ The pill's appearance/dismissal should feel like it materializes and dissolves, 
 ## Layout principles
 
 - **Pill:** single row, icon-left, status-text-right, nothing else. No settings, no branding, no chrome.
-- **Dashboard:** a settings-window layout, not a dashboard-app layout — sidebar or top-tab navigation between Metrics / History / Settings, each section simple enough to fit without scrolling on a laptop screen where reasonable.
+- **Dashboard:** a settings-window layout, not a dashboard-app layout — a floating icon sidebar (not top-tabs) navigates Metrics / History / Settings plus Quit, each section simple enough to fit without scrolling on a laptop screen where reasonable. The Metrics panel itself is stat tiles (sessions/words/time saved), a per-language breakdown (name + proportional bar), and a latency table (stage × p50/p95/samples) — this is the one section with real layout density, everything else stays a single simple list.
 - **No dock icon, no permanent window.** Both surfaces exist only when summoned (pill: during a recording cycle; dashboard: when opened from the menu-bar icon).
 
 ## What this file is not
