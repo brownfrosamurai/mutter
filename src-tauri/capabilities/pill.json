@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pill-events",
+  "description": "The pill HUD (ui/pill/pill.js) is driven entirely by Tauri events emitted from session.rs (mutter://pill-state, mutter://elapsed-seconds, mutter://cancel-countdown) — with no capability granting it core:event permissions, Tauri's default-deny ACL silently rejects every `event.listen` call from that webview, so the pill window never updates even though the backend emits correctly and the rest of the pipeline (capture/transcribe/inject) keeps working.",
+  "windows": ["pill"],
+  "permissions": ["core:event:default"]
+}
