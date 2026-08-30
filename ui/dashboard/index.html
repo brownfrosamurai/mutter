@@ -157,8 +157,19 @@
           </div>
           <div class="setting-row">
             <label>Engine</label>
-            <span class="hint">Whisper (small) — Apple Speech pending Phase 0 benchmark</span>
+            <span class="hint">Whisper (small) — English only; Apple Speech not built (Whisper already won the Phase 0 benchmark for English)</span>
           </div>
+          <div class="setting-row">
+            <label for="grammar-llm-cleanup-toggle">AI grammar cleanup</label>
+            <input type="checkbox" id="grammar-llm-cleanup-toggle" />
+          </div>
+          <p class="hint" id="grammar-llm-cleanup-hint">
+            Runs a small local model on every transcript for real grammar/word-choice
+            correction, on top of the always-on punctuation cleanup. Off by default:
+            downloads a ~390MB model on first use, adds latency to every dictation, and
+            may occasionally reword precise technical terms — worth leaving off while
+            dictating to an AI coding agent.
+          </p>
 
           <!--
             Manual QA tool, not a user-facing feature — the debug_test_injection

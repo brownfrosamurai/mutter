@@ -7,6 +7,8 @@
 
 pub mod apple_speech;
 pub mod grammar;
+pub mod llm_cleanup;
+pub mod pipeline;
 pub mod whisper;
 
 /// Errors an engine or processor can return. Typed on purpose — an untyped
@@ -68,9 +70,14 @@ pub trait TranscriptionEngine: Send + Sync {
     }
 }
 
-/// Text in, text out. Used by the grammar-cleanup step (docs/mutter-project-plan.md
-/// Section 5, Option B) — a per-transcript, user-triggered action, never
-/// always-on middleware in the default pipeline.
+/// Text in, text out. Used by the grammar-cleanup step
+/// (docs/mutter-project-plan.md Section 5). The pipeline actually wired in
+/// `session.rs` is `engine::pipeline::GrammarPipeline` — Option A
+/// (`grammar::RuleBasedCleanup`) always runs, and Option B
+/// (`llm_cleanup::LlmCleanup`) additionally runs when the user has it
+/// toggled on in Settings (default off) — see `pipeline.rs`'s doc comment
+/// for why this ended up always-on rather than the plan's original
+/// per-transcript-triggered design.
 #[async_trait::async_trait]
 pub trait TextProcessor: Send + Sync {
     async fn process(&self, text: &str, language: &str) -> Result<String, EngineError>;

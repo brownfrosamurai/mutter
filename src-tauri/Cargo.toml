@@ -44,6 +44,26 @@ cpal = "0.15"
 whisper-rs = { version = "0.12", features = ["metal"] }
 tokio = { version = "1", features = ["rt", "sync", "macros", "time"] }
 
+# Local-LLM grammar/word-choice cleanup (Section 5, "Option B") — see
+# engine/llm_cleanup.rs. Pure-Rust `candle` (Hugging Face's ML framework),
+# not `llama-cpp-2` — verified live 2026-08-30 that llama-cpp-2 cannot
+# safely coexist with whisper-rs in this binary: both statically link their
+# own independently-vendored copy of GGML, the linker reports hundreds of
+# duplicate-symbol warnings (visible with llama-cpp-2 added) and doesn't
+# hard-error on macOS, silently picking one definition per symbol — proven
+# to actually corrupt behavior, not just a cosmetic warning: the exact same
+# GGUF file that loads perfectly in a standalone llama-cpp-2-only binary
+# fails with spurious "tensor is duplicated" errors once whisper-rs-sys is
+# also linked in, and the specific tensor reported changed between two
+# unrelated GGUF files, which only makes sense as loader corruption, not
+# two coincidentally-bad files. `candle` has no vendored C/GGML dependency
+# at all (its GPU backends are pure Rust + Metal/CUDA bindings), so it
+# can't collide with whisper-rs-sys the same way.
+candle = { package = "candle-core", version = "0.11", features = ["metal"] }
+candle-nn = { version = "0.11", features = ["metal"] }
+candle-transformers = { version = "0.11", features = ["metal"] }
+tokenizers = "0.23"
+
 # Local history storage
 rusqlite = { version = "0.31", features = ["bundled"] }
 rusqlite_migration = "1"

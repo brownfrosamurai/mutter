@@ -58,10 +58,35 @@ async function loadHotkeySettings() {
     const settings = await tauri.core.invoke("get_settings");
     document.getElementById("hotkey-mic").value = settings.mic_hotkey;
     document.getElementById("hotkey-system-audio").value = settings.system_audio_hotkey;
+    document.getElementById("grammar-llm-cleanup-toggle").checked =
+      settings.grammar_llm_cleanup_enabled;
   } catch (err) {
     console.warn("[dashboard] get_settings failed", err);
   }
 }
+
+// Section 5, Option B — off by default; toggling here takes effect on the
+// very next transcript (GrammarPipeline checks the live flag, not a cached
+// value), no restart needed. See engine/llm_cleanup.rs and
+// engine/pipeline.rs for what actually runs when this is on.
+function initGrammarCleanupToggle() {
+  const toggle = document.getElementById("grammar-llm-cleanup-toggle");
+  if (!toggle) return;
+
+  toggle.addEventListener("change", async () => {
+    const enabled = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await window.__TAURI__.core.invoke("set_grammar_llm_cleanup_enabled", { enabled });
+    } catch (err) {
+      console.error("[dashboard] set_grammar_llm_cleanup_enabled failed", err);
+      toggle.checked = !enabled; // revert the checkbox — the setting didn't actually change
+    } finally {
+      toggle.disabled = false;
+    }
+  });
+}
+initGrammarCleanupToggle();
 
 function initHotkeyEditors() {
   document.querySelectorAll(".hotkey-save-btn").forEach((btn) => {

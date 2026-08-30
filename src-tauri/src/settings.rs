@@ -19,6 +19,14 @@ use crate::hotkey;
 pub struct AppSettings {
     pub mic_hotkey: String,
     pub system_audio_hotkey: String,
+    /// Section 5, Option B — off by default: it's an opt-in ~390MB download
+    /// plus real per-transcript latency, not something to silently turn on
+    /// for existing or new users. See `engine::pipeline::GrammarPipeline`
+    /// for how this is actually consumed (checked live, not just at
+    /// startup) and `engine::llm_cleanup` for the always-on-vs-per-
+    /// transcript tradeoff this toggle represents.
+    #[serde(default)]
+    pub grammar_llm_cleanup_enabled: bool,
 }
 
 impl Default for AppSettings {
@@ -26,6 +34,7 @@ impl Default for AppSettings {
         Self {
             mic_hotkey: hotkey::MIC_DICTATION_SHORTCUT_DEFAULT.to_string(),
             system_audio_hotkey: hotkey::SYSTEM_AUDIO_SHORTCUT_DEFAULT.to_string(),
+            grammar_llm_cleanup_enabled: false,
         }
     }
 }
@@ -74,10 +83,26 @@ mod tests {
         let settings = AppSettings {
             mic_hotkey: "CmdOrCtrl+Shift+Space".to_string(),
             system_audio_hotkey: "CmdOrCtrl+Shift+M".to_string(),
+            grammar_llm_cleanup_enabled: true,
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: AppSettings = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.mic_hotkey, settings.mic_hotkey);
         assert_eq!(parsed.system_audio_hotkey, settings.system_audio_hotkey);
+        assert_eq!(
+            parsed.grammar_llm_cleanup_enabled,
+            settings.grammar_llm_cleanup_enabled
+        );
+    }
+
+    #[test]
+    fn grammar_llm_cleanup_defaults_to_disabled_when_missing_from_json() {
+        // Backward compatibility: a settings.json written before this field
+        // existed shouldn't suddenly opt an existing user into a ~390MB
+        // download and per-transcript latency they never asked for.
+        let json =
+            r#"{"mic_hotkey":"CmdOrCtrl+Shift+Space","system_audio_hotkey":"CmdOrCtrl+Shift+M"}"#;
+        let parsed: AppSettings = serde_json::from_str(json).unwrap();
+        assert!(!parsed.grammar_llm_cleanup_enabled);
     }
 }

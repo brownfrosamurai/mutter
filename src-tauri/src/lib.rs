@@ -10,6 +10,7 @@ pub mod permissions;
 pub mod session;
 pub mod settings;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tauri::menu::MenuBuilder;
@@ -180,6 +181,14 @@ fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
     state.inner().0.clone()
 }
 
+/// The live, read-every-call flag `engine::pipeline::GrammarPipeline`
+/// checks — a separate managed type from `Mutex<settings::AppSettings>`
+/// (below) even though `AppSettings` also carries this same value, because
+/// the pipeline needs a cheap atomic read on the hot transcription path,
+/// not a mutex lock shared with hotkey-configuration commands.
+/// `set_grammar_llm_cleanup_enabled` below keeps both in sync.
+struct GrammarLlmCleanupFlag(Arc<AtomicBool>);
+
 #[tauri::command]
 fn get_settings(state: tauri::State<Mutex<settings::AppSettings>>) -> settings::AppSettings {
     state
@@ -249,6 +258,28 @@ fn set_hotkey(
     Ok(())
 }
 
+/// Backs the dashboard's grammar-cleanup toggle (Section 5, "Option B").
+/// Updates the live flag `GrammarPipeline` reads immediately (no restart
+/// needed — the very next transcript picks it up) and persists to
+/// `settings.json` via the same `Mutex<AppSettings>` `set_hotkey` uses.
+#[tauri::command]
+fn set_grammar_llm_cleanup_enabled(
+    enabled: bool,
+    settings_state: tauri::State<Mutex<settings::AppSettings>>,
+    llm_enabled: tauri::State<GrammarLlmCleanupFlag>,
+) -> Result<(), String> {
+    llm_enabled.inner().0.store(enabled, Ordering::Relaxed);
+
+    let mut settings = settings_state
+        .inner()
+        .lock()
+        .expect("settings lock poisoned");
+    settings.grammar_llm_cleanup_enabled = enabled;
+    settings
+        .save()
+        .map_err(|e| format!("setting updated but failed to persist to disk: {e}"))
+}
+
 /// Manual QA tool for the injection path (Section 11 / Phase 8's manual QA
 /// matrix, and Section 15's T12: "validate terminal text-injection... before
 /// Phase 3 begins"). T12 needs a human — it depends on real Accessibility
@@ -293,7 +324,8 @@ pub fn run() {
             get_recovery_info,
             debug_test_injection,
             get_settings,
-            set_hotkey
+            set_hotkey,
+            set_grammar_llm_cleanup_enabled
         ])
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
@@ -304,6 +336,9 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             let app_settings = settings::AppSettings::load();
+            let grammar_llm_cleanup_enabled = Arc::new(AtomicBool::new(
+                app_settings.grammar_llm_cleanup_enabled,
+            ));
 
             // The core loop (hotkey -> capture -> engine -> injection ->
             // history) only comes up if the history store opens cleanly.
@@ -325,8 +360,9 @@ pub fn run() {
                     let history = Arc::new(store);
                     let engine: Arc<dyn engine::TranscriptionEngine> =
                         Arc::new(engine::whisper::WhisperEngine::new());
-                    let grammar: Arc<dyn engine::TextProcessor> =
-                        Arc::new(engine::grammar::RuleBasedCleanup);
+                    let grammar: Arc<dyn engine::TextProcessor> = Arc::new(
+                        engine::pipeline::GrammarPipeline::new(grammar_llm_cleanup_enabled.clone()),
+                    );
 
                     let handle = session::spawn(
                         app_handle.clone(),
@@ -377,6 +413,7 @@ pub fn run() {
             app.manage(session_handle);
             app.manage(history_for_dashboard);
             app.manage(recovery_info);
+            app.manage(GrammarLlmCleanupFlag(grammar_llm_cleanup_enabled));
             app.manage(Mutex::new(app_settings));
 
             // The dashboard window is meant to persist for the app's whole
