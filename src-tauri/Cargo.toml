@@ -16,6 +16,10 @@ path = "src/lib.rs"
 # See https://tauri.app/v1/api/config/#build for build script config
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# Compiles native/system_audio_shim.m — the minimal build-time Objective-C
+# shim for ScreenCaptureKit (see capture/system_audio.rs), not hand-written
+# Swift source, per CLAUDE.md's hard constraint.
+cc = "1"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }

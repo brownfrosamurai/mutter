@@ -2286,6 +2286,7 @@ version = "0.1.0"
 dependencies = [
  "accessibility-sys",
  "async-trait",
+ "cc",
  "core-foundation",
  "core-foundation-sys",
  "core-graphics",
