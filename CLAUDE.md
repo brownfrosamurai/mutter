@@ -32,8 +32,34 @@ Full test strategy and coverage requirements: `docs/mutter-project-plan.md` Sect
 
 ## Current state
 
-Scaffold only, as of 2026-08-29. No feature logic implemented yet. Native-integration modules (`capture/`, `engine/whisper.rs`, `engine/apple_speech.rs`, `injection.rs`) are compiling stubs. `engine/mod.rs` (traits + `EngineError`), `permissions.rs` (`PermissionGate<T>`), and `cancel.rs` (Escape state machine) are written for real since they were fully specified before any code existed.
+**Full implementation underway as of 2026-08-29** (user directive: build the entire roadmap end-to-end, phase by phase, without stopping between phases). This section is kept current at each phase milestone — check here first before assuming a module is still a stub.
 
-Next: Phase 0 spikes per the roadmap (plan Section 15) — engine benchmark (Whisper vs. Apple's on-device Speech framework), pill-window feasibility, ScreenCaptureKit Rust-binding approach — before Phase 1's core loop gets built out.
+Phase 0 spikes:
+- **Pill feasibility: resolved, works.** Live-verified via `cargo tauri dev` + targeted window capture — real per-pixel window transparency, backdrop blur, and a true capsule shape with no square window frame. No fallback to a rectangular HUD needed.
+- **whisper-rs integration path: resolved, whisper-rs bindings.** The native whisper.cpp/ggml build compiles cleanly on this machine (cmake/clang present) — no CLI shell-out or raw FFI needed (plan Section 14). `engine/whisper.rs` is a real implementation: lazy model download+load (curl, no HTTP-client dependency added), resident `WhisperContext`, catch_unwind-guarded inference, language auto-detection returned via the new `Transcript` struct (see below).
+- **Multi-language accuracy benchmark: cannot be completed by the agent.** No microphone/ears in this environment — needs real audio samples in all six languages (Yoruba especially) and human judgment. This is explicitly the user's own Section 17 assignment ("run the Phase 0 engine benchmark yourself, informally"), still outstanding.
+- **ScreenCaptureKit Rust-binding spike: in progress.**
 
-Rust/Cargo are now installed on the dev machine and `cargo check` builds the scaffold clean (verified 2026-08-29).
+**Architecture deviation from the original spec, documented per the user's instruction to flag rather than silently override:** `TranscriptionEngine::transcribe` originally returned `Result<String, EngineError>` with no way to carry the detected language out. `TextProcessor::process` needs a `language` argument (Section 10) and the dashboard needs a per-language breakdown (Section 8) — neither was derivable from a bare `String`. Fixed by introducing `engine::Transcript { text, language }` as the return type. Audio-in stays language-free; only the output shape changed.
+
+Rust/Cargo are installed on the dev machine and whisper-rs's native build compiles cleanly (verified 2026-08-29).
+
+## Skill routing
+
+When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+
+Key routing rules:
+
+- Product ideas/brainstorming → invoke /office-hours
+- Strategy/scope → invoke /plan-ceo-review
+- Architecture → invoke /plan-eng-review
+- Design system/plan review → invoke /design-consultation or /plan-design-review
+- Full review pipeline → invoke /autoplan
+- Bugs/errors → invoke /investigate
+- QA/testing site behavior → invoke /qa or /qa-only
+- Code review/diff check → invoke /review
+- Visual polish → invoke /design-review
+- Ship/deploy/PR → invoke /ship or /land-and-deploy
+- Save progress → invoke /context-save
+- Resume context → invoke /context-restore
+- Author a backlog-ready spec/issue → invoke /spec

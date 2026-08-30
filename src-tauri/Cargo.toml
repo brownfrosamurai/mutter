@@ -33,6 +33,7 @@ cpal = "0.15"
 # docs/mutter-project-plan.md Section 14. Pinning whisper-rs here as the
 # default assumption; revisit after the spike.
 whisper-rs = "0.12"
+tokio = { version = "1", features = ["rt", "sync"] }
 
 # Local history storage
 rusqlite = { version = "0.31", features = ["bundled"] }

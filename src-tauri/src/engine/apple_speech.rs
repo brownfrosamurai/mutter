@@ -12,7 +12,7 @@
 //! same kind of binding decision as the ScreenCaptureKit bridge
 //! (see capture/system_audio.rs), not hand-written Swift source.
 
-use super::{EngineError, TranscriptionEngine};
+use super::{EngineError, Transcript, TranscriptionEngine};
 
 pub struct AppleSpeechEngine {
     // Bridge handle goes here once the binding approach is decided.
@@ -32,7 +32,7 @@ impl Default for AppleSpeechEngine {
 
 #[async_trait::async_trait]
 impl TranscriptionEngine for AppleSpeechEngine {
-    async fn transcribe(&self, _audio: &[f32]) -> Result<String, EngineError> {
+    async fn transcribe(&self, _audio: &[f32]) -> Result<Transcript, EngineError> {
         Err(EngineError::ModelNotLoaded(
             "AppleSpeechEngine is a scaffold stub — pending Phase 0 benchmark result".into(),
         ))

@@ -27,13 +27,30 @@ pub enum EngineError {
     Timeout(std::time::Duration),
 }
 
+/// Result of one transcription: the recognized text, plus the language
+/// whisper.cpp auto-detected (e.g. `"en"`, `"yo"`).
+///
+/// Added during implementation: Section 10 describes `TextProcessor::process`
+/// as taking a `language` argument, and Section 8's dashboard needs a
+/// per-language breakdown, but the trait as originally specified returned a
+/// bare `String` with no way to carry the detected language out of
+/// `transcribe()`. Audio-in stays language-free — Section 10's
+/// auto-detect-only decision is unchanged, this only fixes the *output*
+/// shape so downstream consumers that need the language don't have to
+/// re-derive it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transcript {
+    pub text: String,
+    pub language: String,
+}
+
 /// Audio in, text out. Implemented by `WhisperEngine` and (if the Phase 0
 /// benchmark favors it) `AppleSpeechEngine`. Language is auto-detected from
 /// the audio, not manually selected — see docs/mutter-project-plan.md
 /// Section 10.
 #[async_trait::async_trait]
 pub trait TranscriptionEngine: Send + Sync {
-    async fn transcribe(&self, audio: &[f32]) -> Result<String, EngineError>;
+    async fn transcribe(&self, audio: &[f32]) -> Result<Transcript, EngineError>;
 }
 
 /// Text in, text out. Used by the grammar-cleanup step (docs/mutter-project-plan.md
