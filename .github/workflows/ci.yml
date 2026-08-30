@@ -11,10 +11,12 @@ name: CI
 #   - Ed25519 update-signature verification test (no update manifest/keys
 #     exist yet — tauri-plugin-updater is a dependency but inactive in
 #     tauri.conf.json)
-#   - an integration test running fixture audio through the full pipeline
-#     per registered engine (Section 11) — needs a real, checked-in audio
-#     fixture and a downloaded model, deliberately not added as a CI-blocking
-#     step given the ~500MB model download that would require
+#   - the fixture-audio integration test (src-tauri/tests/fixture_audio.rs,
+#     Section 11) now exists and is real (a checked-in synthesized-speech
+#     WAV run through the actual WhisperEngine) but stays `#[ignore]`d and
+#     out of this workflow — `cargo test` above does not pass `--ignored`,
+#     so it never runs here. Rationale unchanged: a ~500MB model download
+#     per CI run isn't worth adding as a required, non-cached gate for v1
 
 on:
   push:

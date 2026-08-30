@@ -171,8 +171,18 @@ impl TranscriptionEngine for WhisperEngine {
 
                 let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
                 // Auto-detect, never manual — docs/mutter-project-plan.md Section 10.
+                // Leaving `language` unset (None) already makes whisper.cpp
+                // auto-detect as part of the normal transcription pass.
+                // Do NOT also call `set_detect_language(true)`: per
+                // whisper.cpp's own source (whisper_full, the
+                // `if (params.detect_language) { return 0; }` branch right
+                // after language ID), that flag means "detect the language
+                // and stop" — it skips transcription entirely. Setting it
+                // silently produced an empty transcript on every real
+                // recording; caught by the fixture-audio integration test
+                // (tests/fixture_audio.rs), which got detected language
+                // "en" back but an empty `text` until this was removed.
                 params.set_language(None);
-                params.set_detect_language(true);
                 params.set_translate(false);
                 params.set_print_special(false);
                 params.set_print_progress(false);
@@ -233,6 +243,6 @@ mod tests {
     }
 
     // Real model loading + inference needs a ~500MB download and a real
-    // audio sample — exercised by the Phase 0 benchmark harness
-    // (examples/whisper_benchmark.rs), not an automated unit test.
+    // audio sample — exercised by the ignored fixture-audio integration
+    // test (tests/fixture_audio.rs), not a fast unit test.
 }

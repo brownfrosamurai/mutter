@@ -65,6 +65,11 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["all
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard"] } # NSPasteboard
 tracing-appender = "0.2"
 
+[dev-dependencies]
+# WAV decoding for the fixture-audio integration test only (tests/fixture_audio.rs)
+# — never a runtime dependency, whisper.rs takes raw f32 samples directly.
+hound = "3"
+
 [features]
 # Empty for now — custom-protocol is added automatically by tauri-build in
 # release configs; no manual feature flags needed at scaffold time.
