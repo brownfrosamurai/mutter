@@ -12,13 +12,14 @@
 //! detected language back out via `Transcript::language`.
 //!
 //! Model tiering (Section 6): `Small` is the only tier currently routed to
-//! by default. `Medium` is wired and functional but nothing selects it yet
-//! — the per-language routing decision requires a real accuracy benchmark
-//! across all six languages (Yoruba specifically called out) that this
-//! environment cannot run: it needs real multi-language audio samples and a
-//! human listening for correctness, neither of which exist here. That
-//! benchmark is explicitly the user's own task per Section 17 ("run the
-//! Phase 0 engine benchmark yourself, informally").
+//! by default. `Medium` is wired and functional but nothing selects it —
+//! `tests/language_benchmark.rs` measured Small at 100% accuracy on English
+//! (same as Medium, 3x faster), so there's no case for routing to it while
+//! v1 stays scoped to English. Yoruba and the other four originally-named
+//! languages are parked by the user's own direction (2026-08-30, see
+//! CLAUDE.md and `docs/mutter-project-plan.md` Section 6's status note) —
+//! not removed, since auto-detection still transcribes them if dictated,
+//! just not benchmarked or specifically tiered right now.
 
 use std::path::PathBuf;
 use std::process::Command;
