@@ -393,7 +393,8 @@ finding above. Run with Claude Code or Codex; checkbox as you ship.
   - Surfaced by: Outside voice — manual language switching conflicts with blazing-fast widget UX
   - Files: Section 10
   - Verify: dictating in a non-default language produces correct output with no settings change
-- [ ] **T12 (P1)** — core/capture — Validate terminal text-injection in Phase 2, not deferred to Phase 8
+- [x] **T12 (P1)** — core/capture — Validate terminal text-injection in Phase 2, not deferred to Phase 8
   - Surfaced by: Outside voice — highest-risk integration point (AI-agent REPL dictation) was tested last
   - Files: Section 15
   - Verify: dictation into an interactive terminal REPL works correctly (bracketed-paste-mode, multi-line) before Phase 3 begins
+  - **Done 2026-08-30** (later than the plan wanted, but done): validated via the injection path directly (`debug_test_injection`, not full mic-to-text dictation — see CLAUDE.md) against a real Terminal window. Multi-line text landed as literal text in one paste, bracketed-paste respected, not executed line-by-line.
