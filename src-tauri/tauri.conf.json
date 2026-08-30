@@ -7,6 +7,7 @@
     "frontendDist": "../ui"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "pill",
@@ -19,7 +20,7 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "visible": true,
+        "visible": false,
         "shadow": false
       },
       {
@@ -31,7 +32,7 @@
         "resizable": true,
         "decorations": true,
         "transparent": true,
-        "visible": true
+        "visible": false
       }
     ],
     "trayIcon": {
@@ -51,7 +52,8 @@
     ],
     "macOS": {
       "minimumSystemVersion": "14.0",
-      "entitlements": null
+      "entitlements": null,
+      "signingIdentity": "-"
     }
   },
   "plugins": {

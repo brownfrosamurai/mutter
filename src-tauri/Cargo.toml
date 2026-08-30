@@ -32,7 +32,7 @@ cpal = "0.15"
 # resolved: whisper-rs's native whisper.cpp/ggml build compiles cleanly on
 # this toolchain — no CLI shell-out or raw FFI fallback needed.
 whisper-rs = "0.12"
-tokio = { version = "1", features = ["rt", "sync"] }
+tokio = { version = "1", features = ["rt", "sync", "macros", "time"] }
 
 # Local history storage
 rusqlite = { version = "0.31", features = ["bundled"] }

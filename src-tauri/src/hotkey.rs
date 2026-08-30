@@ -75,6 +75,11 @@ where
         })
         .map_err(|e| HotkeyError::RegisterFailed(e.to_string()))?;
 
+    tracing::info!(
+        mic = MIC_DICTATION_SHORTCUT,
+        system_audio = SYSTEM_AUDIO_SHORTCUT,
+        "global hotkeys registered"
+    );
     Ok(())
 }
 

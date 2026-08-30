@@ -6,6 +6,7 @@
 //! docs/mutter-project-plan.md Section 10.
 
 pub mod apple_speech;
+pub mod grammar;
 pub mod whisper;
 
 /// Errors an engine or processor can return. Typed on purpose — an untyped
