@@ -33,13 +33,116 @@ fn cancel_recording(state: tauri::State<Option<session::SessionHandle>>) -> Resu
     }
 }
 
+// --- Dashboard IPC (Phase 5, Section 8) ---
+//
+// DTOs kept separate from the `history` module's own types rather than
+// deriving `Serialize` on them directly — the wire shape (camelCase-ish
+// field names the frontend expects) is a UI concern, not a storage-layer
+// one, and this keeps `history::HistoryEntry`/`Metrics` free of a
+// dependency on `serde` they don't otherwise need.
+
+#[derive(serde::Serialize)]
+struct MetricsDto {
+    sessions: i64,
+    words: i64,
+    time_saved_minutes: f64,
+    average_wpm: f64,
+}
+
+#[derive(serde::Serialize)]
+struct LanguageStatDto {
+    language: String,
+    count: i64,
+}
+
+#[derive(serde::Serialize)]
+struct HistoryEntryDto {
+    timestamp: i64,
+    duration_secs: f64,
+    text: String,
+    language: String,
+    engine: String,
+}
+
+#[tauri::command]
+fn get_metrics(
+    state: tauri::State<Option<Arc<history::HistoryStore>>>,
+) -> Result<MetricsDto, String> {
+    let store = state.inner().as_ref().ok_or("history store unavailable")?;
+    let m = store
+        .metrics(history::DEFAULT_TYPING_WPM)
+        .map_err(|e| e.to_string())?;
+    Ok(MetricsDto {
+        sessions: m.total_transcriptions,
+        words: m.total_word_count,
+        time_saved_minutes: m.time_saved_minutes,
+        average_wpm: m.average_wpm,
+    })
+}
+
+#[tauri::command]
+fn get_language_breakdown(
+    state: tauri::State<Option<Arc<history::HistoryStore>>>,
+) -> Result<Vec<LanguageStatDto>, String> {
+    let store = state.inner().as_ref().ok_or("history store unavailable")?;
+    let rows = store.language_breakdown().map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(language, count)| LanguageStatDto { language, count })
+        .collect())
+}
+
+#[tauri::command]
+fn get_history_page(
+    page: u32,
+    page_size: u32,
+    state: tauri::State<Option<Arc<history::HistoryStore>>>,
+) -> Result<Vec<HistoryEntryDto>, String> {
+    let store = state.inner().as_ref().ok_or("history store unavailable")?;
+    let rows = store.list_page(page, page_size).map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|e| HistoryEntryDto {
+            timestamp: e.timestamp,
+            duration_secs: e.duration_secs,
+            text: e.text,
+            language: e.language,
+            engine: e.engine,
+        })
+        .collect())
+}
+
+/// Backs the history list's "copy" button — Section 8: "doubles as the
+/// copy-and-paste-at-any-time recovery mechanism".
+#[tauri::command]
+fn copy_history_text(text: String) -> Result<(), String> {
+    injection::copy_to_clipboard(&text).map_err(|e| e.to_string())
+}
+
+/// Backs the dashboard sidebar's quit button. The tray menu's predefined
+/// "Quit" item (see `run()`) is the primary quit path; this is the same
+/// action reachable from the dashboard itself, per the reference mockup's
+/// sidebar layout — not worth adding the separate `tauri-plugin-process`
+/// dependency for one button when `AppHandle::exit` already does this.
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 pub fn run() {
     logging::init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![cancel_recording])
+        .invoke_handler(tauri::generate_handler![
+            cancel_recording,
+            get_metrics,
+            get_language_breakdown,
+            get_history_page,
+            copy_history_text,
+            quit_app
+        ])
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
             // via Info.plist, per docs/mutter-project-plan.md Section 4
@@ -58,8 +161,10 @@ pub fn run() {
             // loudly and the session simply doesn't start, so the app
             // still opens (tray + dashboard) without silently pretending
             // dictation works.
-            let session_handle: Option<session::SessionHandle> = match history::HistoryStore::open()
-            {
+            let (session_handle, history_for_dashboard): (
+                Option<session::SessionHandle>,
+                Option<Arc<history::HistoryStore>>,
+            ) = match history::HistoryStore::open() {
                 Ok(store) => {
                     let history = Arc::new(store);
                     let engine: Arc<dyn engine::TranscriptionEngine> =
@@ -71,7 +176,7 @@ pub fn run() {
                         app_handle.clone(),
                         engine,
                         grammar,
-                        history,
+                        history.clone(),
                         DEFAULT_ENGINE_NAME,
                     );
 
@@ -80,17 +185,18 @@ pub fn run() {
                         hotkey_handle.hotkey_pressed(mode);
                     })?;
 
-                    Some(handle)
+                    (Some(handle), Some(history))
                 }
                 Err(e) => {
                     tracing::error!(
                         error = %e,
                         "history store failed to open — dictation disabled this session"
                     );
-                    None
+                    (None, None)
                 }
             };
             app.manage(session_handle);
+            app.manage(history_for_dashboard);
 
             // tauri.conf.json's `app.trayIcon` already creates the tray
             // icon itself at startup (id "main") — this attaches the menu

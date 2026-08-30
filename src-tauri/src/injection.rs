@@ -140,6 +140,24 @@ impl Drop for AxElementGuard {
     }
 }
 
+/// Plain clipboard write, no paste/restore dance — used by the dashboard's
+/// history "copy" button (Section 8: "doubles as the copy-and-paste-at-any-
+/// time recovery mechanism"), which just wants the text on the clipboard
+/// for the user to paste themselves, unlike `insert_at_cursor`'s
+/// synthetic-paste fallback.
+pub fn copy_to_clipboard(text: &str) -> Result<(), InjectionError> {
+    let pasteboard = NSPasteboard::generalPasteboard();
+    let string_type = unsafe { NSPasteboardTypeString };
+    pasteboard.clearContents();
+    let ns_text = NSString::from_str(text);
+    if !pasteboard.setString_forType(&ns_text, string_type) {
+        return Err(InjectionError::FallbackFailed(
+            "NSPasteboard rejected the write".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Clipboard swap + synthetic Cmd+V, original clipboard plain-text contents
 /// restored afterward.
 fn clipboard_fallback(text: &str) -> Result<(), InjectionError> {

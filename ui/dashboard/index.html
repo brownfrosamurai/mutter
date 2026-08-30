@@ -13,7 +13,12 @@
     (tauri.conf.json's `decorations: true` for this window) supply the
     title bar and traffic lights, so the content card draws neither.
 
-    STUB: static shell only, no live data — Phase 5 (dashboard) work.
+    Metrics/Languages/History are wired to real data via dashboard.js's
+    Tauri commands (Phase 5). The Latency section stays a placeholder
+    deliberately — it's from the reference mockup used to design this UI,
+    not from docs/mutter-project-plan.md Section 8's actual metric list,
+    and building real p50/p95 latency tracking wasn't judged worth the
+    added scope without the plan calling for it.
   -->
   <div id="shell">
     <nav id="sidebar" class="glass-panel" aria-label="Primary">
@@ -92,7 +97,7 @@
               </thead>
               <tbody>
                 <tr>
-                  <td colspan="4" class="hint">No data yet — metrics populate once the core loop (Phase 1) is implemented.</td>
+                  <td colspan="4" class="hint">Not tracked — not part of the plan's metric list (Section 8), kept here to match the reference mockup's layout only.</td>
                 </tr>
               </tbody>
             </table>
@@ -101,7 +106,7 @@
 
         <section id="panel-history" class="panel">
           <ul id="history-list"></ul>
-          <p class="hint">Empty — local history store (Phase 2) not yet implemented.</p>
+          <p class="hint" id="history-hint">Loading…</p>
         </section>
 
         <section id="panel-settings" class="panel">

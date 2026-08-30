@@ -51,6 +51,7 @@ pub struct HistoryEntry {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Metrics {
     pub total_transcriptions: i64,
+    pub total_word_count: i64,
     pub time_saved_minutes: f64,
     pub average_wpm: f64,
 }
@@ -190,9 +191,34 @@ impl HistoryStore {
 
         Ok(Metrics {
             total_transcriptions: total_count,
+            total_word_count,
             time_saved_minutes,
             average_wpm,
         })
+    }
+
+    /// Per-language transcription counts, most-used first. Not part of
+    /// Section 8's metric table (which only specifies time-saved/total/WPM/
+    /// activity feed) — added because the dashboard's Languages section
+    /// (built to match a user-supplied reference mockup) needs real data
+    /// rather than a permanent "no data yet" placeholder. A plain `GROUP
+    /// BY` over `history`, not a running aggregate — language cardinality
+    /// is tiny (six languages, per the plan's scope), so a full scan here
+    /// is cheap even at large row counts, unlike `recompute_aggregates`'s
+    /// per-word tokenization.
+    pub fn language_breakdown(&self) -> Result<Vec<(String, i64)>, HistoryError> {
+        let conn = self.conn.lock().expect("history db lock poisoned");
+        let mut stmt = conn
+            .prepare(
+                "SELECT language, COUNT(*) as cnt FROM history
+                 GROUP BY language ORDER BY cnt DESC",
+            )
+            .map_err(|e| HistoryError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| HistoryError::Database(e.to_string()))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| HistoryError::Database(e.to_string()))
     }
 
     /// Manual drift-correction action — full-table scan, acceptable as an
@@ -250,13 +276,32 @@ mod tests {
     }
 
     fn sample_entry(text: &str, duration_secs: f64) -> HistoryEntry {
+        sample_entry_in(text, duration_secs, "en")
+    }
+
+    fn sample_entry_in(text: &str, duration_secs: f64, language: &str) -> HistoryEntry {
         HistoryEntry {
             timestamp: 1_700_000_000,
             duration_secs,
             text: text.to_string(),
-            language: "en".to_string(),
+            language: language.to_string(),
             engine: "whisper-small".to_string(),
         }
+    }
+
+    #[test]
+    fn language_breakdown_counts_and_orders_by_usage() {
+        let path = temp_db_path();
+        let store = HistoryStore::open_at(&path).unwrap();
+
+        store.insert(&sample_entry_in("hi", 1.0, "en")).unwrap();
+        store.insert(&sample_entry_in("hi", 1.0, "en")).unwrap();
+        store.insert(&sample_entry_in("bonjour", 1.0, "fr")).unwrap();
+
+        let breakdown = store.language_breakdown().unwrap();
+        assert_eq!(breakdown, vec![("en".to_string(), 2), ("fr".to_string(), 1)]);
+
+        std::fs::remove_file(&path).ok();
     }
 
     #[test]
