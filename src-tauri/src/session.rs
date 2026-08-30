@@ -42,7 +42,12 @@
 //!   where it left off") since capture was never interrupted; the only
 //!   observable difference from a true pause is that audio spoken during
 //!   the countdown itself is retained on resume — a reasonable superset,
-//!   not a bug.
+//!   not a bug. Because capture keeps running during `CancelPending`, it
+//!   can still hit the 120s cap mid-countdown — the main loop's `at_cap`
+//!   branch handles that explicitly (auto-continue, silently, no pill-state
+//!   flicker over the countdown UI) rather than only reacting to it during
+//!   `Listening`; see that match arm's comment for why skipping it there
+//!   would be a silent data-loss bug, not just a missed UI update.
 //! - *Cancel scope*: Section 7 says "Recording or transcribing → Escape".
 //!   This implementation only offers cancel during `Listening`, not
 //!   `Transcribing` — by the time capture has stopped and audio has been
@@ -302,6 +307,7 @@ pub fn spawn<R: Runtime>(
     // "entered" the way a bare `tokio::spawn` requires ("there is no
     // reactor running" otherwise). Tauri's wrapper spawns onto the runtime
     // it manages internally regardless of the calling context.
+    tauri::async_runtime::spawn(run(app, engine.clone(), tx.clone(), rx, segment_tx));
     tauri::async_runtime::spawn(segment_worker(
         engine,
         grammar,
@@ -309,13 +315,13 @@ pub fn spawn<R: Runtime>(
         engine_name,
         segment_rx,
     ));
-    tauri::async_runtime::spawn(run(app, tx.clone(), rx, segment_tx));
 
     SessionHandle { tx }
 }
 
 async fn run<R: Runtime>(
     app: AppHandle<R>,
+    engine: Arc<dyn TranscriptionEngine>,
     tx: mpsc::UnboundedSender<SessionCommand>,
     mut rx: mpsc::UnboundedReceiver<SessionCommand>,
     segment_tx: mpsc::UnboundedSender<SegmentJob>,
@@ -325,6 +331,10 @@ async fn run<R: Runtime>(
     let mut elapsed_secs: u64 = 0;
     let mut cancel_remaining: u8 = 0;
     let mut final_done_rx: Option<oneshot::Receiver<()>> = None;
+    // Section 6, Performance Issue 8: only the very first hand-off to the
+    // engine in the process lifetime should show "loading" instead of
+    // "transcribing" — see `warm_up_model_if_needed`.
+    let mut model_ready = false;
 
     let (at_cap_tx, mut at_cap_rx) = mpsc::unbounded_channel::<CaptureAtCap>();
     let capture = spawn_capture_actor(at_cap_tx);
@@ -361,6 +371,7 @@ async fn run<R: Runtime>(
                             let audio = system_audio.stop().await;
                             system_audio_active = false;
                             phase = Phase::Transcribing; // reuses the mic Phase's Transcribing/done handling
+                            warm_up_model_if_needed(&app, &engine, &mut model_ready, true).await;
                             emit_state(&app, "transcribing");
                             let (done_tx, done_rx) = oneshot::channel();
                             let _ = segment_tx.send(SegmentJob { audio, done_tx: Some(done_tx) });
@@ -401,6 +412,7 @@ async fn run<R: Runtime>(
                             let audio = capture.stop().await;
                             cancel_fsm = CancelStateMachine::new();
                             phase = Phase::Transcribing;
+                            warm_up_model_if_needed(&app, &engine, &mut model_ready, true).await;
                             emit_state(&app, "transcribing");
                             let (done_tx, done_rx) = oneshot::channel();
                             let _ = segment_tx.send(SegmentJob { audio, done_tx: Some(done_tx) });
@@ -431,21 +443,58 @@ async fn run<R: Runtime>(
                 }
             }
             at_cap = at_cap_rx.recv() => {
-                if at_cap.is_some() && phase == Phase::Listening {
-                    let audio = capture.stop().await;
-                    emit_state(&app, "transcribing");
-                    let _ = segment_tx.send(SegmentJob { audio, done_tx: None });
-                    if start_listening(&app, &capture).await {
-                        emit_state(&app, "listening");
-                    } else {
-                        phase = Phase::Idle;
-                        unregister_escape(&app);
+                match phase {
+                    Phase::Listening if at_cap.is_some() => {
+                        let audio = capture.stop().await;
+                        warm_up_model_if_needed(&app, &engine, &mut model_ready, true).await;
+                        emit_state(&app, "transcribing");
+                        let _ = segment_tx.send(SegmentJob { audio, done_tx: None });
+                        if start_listening(&app, &capture).await {
+                            emit_state(&app, "listening");
+                        } else {
+                            phase = Phase::Idle;
+                            unregister_escape(&app);
+                        }
                     }
+                    // The 120s cap can be hit while a cancel countdown is
+                    // pending too — module docs: capture keeps buffering in
+                    // the background during CancelPending, it's never
+                    // paused. Without handling it here, capture/mic.rs's
+                    // audio callback (which gates on its own `at_cap` flag)
+                    // silently stops accepting new samples forever once it
+                    // hits the cap, and this channel's single at-cap
+                    // notification is only ever sent once per capture
+                    // start/stop cycle — so if the branch above is the only
+                    // consumer, a countdown that later resumes (second
+                    // Escape -> Listening) looks like it's still recording
+                    // while actually capturing nothing until the next
+                    // toggle-stop, a silent data-loss bug. Auto-continue
+                    // exactly like the Listening case, but without emitting
+                    // pill-state changes — the cap-driven segment hop must
+                    // stay invisible to the pending cancel/resume decision
+                    // (no flicker to "transcribing"/"listening" over top of
+                    // the countdown UI).
+                    Phase::CancelPending if at_cap.is_some() => {
+                        let audio = capture.stop().await;
+                        warm_up_model_if_needed(&app, &engine, &mut model_ready, false).await;
+                        let _ = segment_tx.send(SegmentJob { audio, done_tx: None });
+                        if capture.start().await.is_err() {
+                            tracing::error!(
+                                "failed to restart mic capture after cap during cancel-pending"
+                            );
+                            cancel_fsm = CancelStateMachine::new();
+                            phase = Phase::Idle;
+                            unregister_escape(&app);
+                            hide_pill(&app);
+                        }
+                    }
+                    _ => {}
                 }
             }
             sa_at_cap = sa_at_cap_rx.recv() => {
                 if sa_at_cap.is_some() && system_audio_active {
                     let audio = system_audio.stop().await;
+                    warm_up_model_if_needed(&app, &engine, &mut model_ready, true).await;
                     emit_state(&app, "transcribing");
                     let _ = segment_tx.send(SegmentJob { audio, done_tx: None });
                     match system_audio.start().await {
@@ -557,6 +606,31 @@ fn unix_now_secs() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as i64
+}
+
+/// Pays the engine's one-time model-load cost (if any) before its first
+/// real use in this process, showing a distinct "loading" pill state while
+/// it happens so a slow first load (a ~500MB download, on a fresh install)
+/// doesn't look indistinguishable from a hang under a generic "transcribing"
+/// label. `visible: false` is used only for the cap-during-cancel-pending
+/// hand-off, which deliberately never changes pill state (see that call
+/// site) — the warm-up still has to happen exactly once, just silently.
+async fn warm_up_model_if_needed<R: Runtime>(
+    app: &AppHandle<R>,
+    engine: &Arc<dyn TranscriptionEngine>,
+    model_ready: &mut bool,
+    visible: bool,
+) {
+    if *model_ready {
+        return;
+    }
+    if visible {
+        emit_state(app, "loading");
+    }
+    if let Err(e) = engine.ensure_ready().await {
+        tracing::error!(error = %e, "engine failed to warm up — the segment worker's own transcribe() call will surface this error");
+    }
+    *model_ready = true;
 }
 
 async fn start_listening<R: Runtime>(app: &AppHandle<R>, capture: &CaptureHandle) -> bool {

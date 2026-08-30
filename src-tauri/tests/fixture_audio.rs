@@ -42,6 +42,17 @@ async fn whisper_engine_transcribes_fixture_audio() {
     assert!(!audio.is_empty(), "fixture audio should not be empty");
 
     let engine = WhisperEngine::new();
+    // session.rs calls ensure_ready() before the first transcribe() to show
+    // a distinct pill "loading" state (Section 6, Performance Issue 8) —
+    // exercise that same sequence here, not just a bare transcribe() call,
+    // so a regression in that path (e.g. ensure_ready() not actually
+    // populating the same lazily-loaded context transcribe() reuses) would
+    // show up as this test hanging or re-downloading rather than passing
+    // silently.
+    engine
+        .ensure_ready()
+        .await
+        .expect("ensure_ready should load the model successfully");
     let transcript = engine
         .transcribe(&audio)
         .await

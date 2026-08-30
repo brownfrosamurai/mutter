@@ -52,6 +52,20 @@ pub struct Transcript {
 #[async_trait::async_trait]
 pub trait TranscriptionEngine: Send + Sync {
     async fn transcribe(&self, audio: &[f32]) -> Result<Transcript, EngineError>;
+
+    /// Pay any one-time model-load cost up front, separately from
+    /// `transcribe()`. Lets the session orchestrator show a distinct
+    /// "loading" pill state for the (potentially very slow — a ~500MB
+    /// download on first run ever) first call, rather than folding that
+    /// latency silently into the first "transcribing" state where it would
+    /// look indistinguishable from a hang (Section 6, Performance Issue 8:
+    /// "first transcription pays load latency, shown via the pill's loading
+    /// state, subsequent ones don't"). Default no-op — only engines with a
+    /// real lazy-load cost (currently just `WhisperEngine`) need to
+    /// override this.
+    async fn ensure_ready(&self) -> Result<(), EngineError> {
+        Ok(())
+    }
 }
 
 /// Text in, text out. Used by the grammar-cleanup step (docs/mutter-project-plan.md

@@ -159,6 +159,11 @@ impl Default for WhisperEngine {
 
 #[async_trait::async_trait]
 impl TranscriptionEngine for WhisperEngine {
+    async fn ensure_ready(&self) -> Result<(), EngineError> {
+        self.context().await?;
+        Ok(())
+    }
+
     async fn transcribe(&self, audio: &[f32]) -> Result<Transcript, EngineError> {
         let context = self.context().await?;
         let audio = audio.to_vec();
