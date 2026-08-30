@@ -28,10 +28,9 @@ serde_json = "1"
 # Audio capture
 cpal = "0.15"
 
-# Speech-to-text engine (whisper.cpp bindings) — integration path (whisper-rs
-# bindings vs. CLI shell-out vs. FFI) is an open Phase 0 spike, see
-# docs/mutter-project-plan.md Section 14. Pinning whisper-rs here as the
-# default assumption; revisit after the spike.
+# Speech-to-text engine (whisper.cpp bindings). Phase 0 spike (Section 14)
+# resolved: whisper-rs's native whisper.cpp/ggml build compiles cleanly on
+# this toolchain — no CLI shell-out or raw FFI fallback needed.
 whisper-rs = "0.12"
 tokio = { version = "1", features = ["rt", "sync"] }
 
@@ -49,6 +48,17 @@ thiserror = "1"
 # Async trait support (stable async fn in traits doesn't yet support
 # object-safety the way this codebase needs it — revisit if/when it does)
 async-trait = "0.1"
+
+# macOS Accessibility API (AXUIElement) for insert-at-cursor, plus the
+# clipboard-swap + synthetic-paste fallback for apps (terminals) that don't
+# expose a settable AX attribute. See injection.rs.
+accessibility-sys = "0.2.0"
+core-foundation = "0.10.1"
+core-foundation-sys = "0.8"
+core-graphics = "0.25.0" # synthetic Cmd+V via CGEvent
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["alloc", "NSString"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard"] } # NSPasteboard
 
 [features]
 # Empty for now — custom-protocol is added automatically by tauri-build in
