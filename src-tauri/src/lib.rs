@@ -166,6 +166,19 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/// Set only when `HistoryStore::open()` returned `MigrationFailed` — holds
+/// the backup path the recovery window (Section 11) names. `None` in the
+/// normal case, and also in the "some other database error" case (e.g. the
+/// app-support directory couldn't be created), which the plan doesn't
+/// single out for the recovery screen — that's handled by the existing
+/// graceful-degradation path (log + disable session, app still opens).
+struct RecoveryInfo(Option<String>);
+
+#[tauri::command]
+fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
+    state.inner().0.clone()
+}
+
 pub fn run() {
     logging::init();
 
@@ -179,7 +192,8 @@ pub fn run() {
             get_history_page,
             copy_history_text,
             get_permission_status,
-            quit_app
+            quit_app,
+            get_recovery_info
         ])
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
@@ -194,14 +208,17 @@ pub fn run() {
             // history) only comes up if the history store opens cleanly.
             // Section 11's documented contract on a migration failure is
             // "refuse to launch normally and show a recovery screen naming
-            // the backup path" — the recovery *screen* isn't built yet
-            // (real UI work, not wired here); today a failure is logged
-            // loudly and the session simply doesn't start, so the app
-            // still opens (tray + dashboard) without silently pretending
-            // dictation works.
-            let (session_handle, history_for_dashboard): (
+            // the backup path" — handled below by showing the `recovery`
+            // window instead of ever registering hotkeys or showing the
+            // pill/dashboard. A non-migration open failure (e.g. the
+            // app-support directory itself couldn't be created) isn't
+            // covered by that specific contract, so it keeps the milder
+            // fallback: log loudly, disable dictation for the session, but
+            // let the tray + dashboard still come up.
+            let (session_handle, history_for_dashboard, recovery_info): (
                 Option<session::SessionHandle>,
                 Option<Arc<history::HistoryStore>>,
+                RecoveryInfo,
             ) = match history::HistoryStore::open() {
                 Ok(store) => {
                     let history = Arc::new(store);
@@ -223,18 +240,37 @@ pub fn run() {
                         hotkey_handle.hotkey_pressed(mode);
                     })?;
 
-                    (Some(handle), Some(history))
+                    (Some(handle), Some(history), RecoveryInfo(None))
+                }
+                Err(history::HistoryError::MigrationFailed(backup_path)) => {
+                    tracing::error!(
+                        backup_path = %backup_path,
+                        "history db migration failed — refusing to launch normally, showing recovery screen"
+                    );
+                    if let Some(win) = app.get_webview_window("pill") {
+                        let _ = win.close();
+                    }
+                    if let Some(win) = app.get_webview_window("dashboard") {
+                        let _ = win.close();
+                    }
+                    if let Some(win) = app.get_webview_window("recovery") {
+                        let _ = win.show();
+                        let _ = win.set_focus();
+                    }
+                    (None, None, RecoveryInfo(Some(backup_path)))
                 }
                 Err(e) => {
                     tracing::error!(
                         error = %e,
                         "history store failed to open — dictation disabled this session"
                     );
-                    (None, None)
+                    (None, None, RecoveryInfo(None))
                 }
             };
+            let in_recovery = recovery_info.0.is_some();
             app.manage(session_handle);
             app.manage(history_for_dashboard);
+            app.manage(recovery_info);
 
             // tauri.conf.json's `app.trayIcon` already creates the tray
             // icon itself at startup (id "main") — this attaches the menu
@@ -246,9 +282,14 @@ pub fn run() {
                 .build()?;
             if let Some(tray) = app.tray_by_id("main") {
                 tray.set_menu(Some(menu))?;
-                tray.on_menu_event(|app, event| {
+                tray.on_menu_event(move |app, event| {
                     if event.id() == "open_dashboard" {
-                        if let Some(win) = app.get_webview_window("dashboard") {
+                        // In recovery mode the dashboard window was closed
+                        // above and has no working history store behind
+                        // it anyway — route back to the recovery screen
+                        // instead of trying (and failing) to open it.
+                        let label = if in_recovery { "recovery" } else { "dashboard" };
+                        if let Some(win) = app.get_webview_window(label) {
                             let _ = win.show();
                             let _ = win.set_focus();
                         }

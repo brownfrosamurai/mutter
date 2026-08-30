@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Mutter — Recovery</title>
+  <link rel="stylesheet" href="recovery.css" />
+</head>
+<body>
+  <!--
+    Section 11's migration-failure contract: "the app refuses to launch
+    normally and shows a clear 'history database needs attention' screen
+    naming the backup path — never launching against a half-migrated
+    schema or risking silent data loss." This window is shown INSTEAD of
+    the pill/dashboard (see lib.rs's setup()) when HistoryStore::open()
+    returns HistoryError::MigrationFailed — dictation and the dashboard
+    stay off for the whole session rather than pretending history/metrics
+    work while writes would hit a broken schema.
+  -->
+  <div id="card" class="glass-panel">
+    <div id="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 3 2 20h20L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M12 9.5v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        <circle cx="12" cy="17" r="0.9" fill="currentColor" />
+      </svg>
+    </div>
+    <h1>History database needs attention</h1>
+    <p id="message">
+      Mutter couldn't finish updating its local history database, so it
+      hasn't started dictation or the dashboard this session — that's
+      safer than running against a half-updated file.
+    </p>
+    <div class="detail-row">
+      <span class="detail-label">Your existing history was backed up to:</span>
+      <code id="backup-path">—</code>
+    </div>
+    <p class="hint">
+      Nothing was lost. Restart Mutter to try again, or contact support with
+      the path above if this keeps happening.
+    </p>
+    <button id="quit-btn" type="button">Quit Mutter</button>
+  </div>
+
+  <script src="recovery.js"></script>
+</body>
+</html>

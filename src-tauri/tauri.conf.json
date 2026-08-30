@@ -33,6 +33,17 @@
         "decorations": true,
         "transparent": true,
         "visible": false
+      },
+      {
+        "label": "recovery",
+        "title": "Mutter",
+        "url": "recovery/index.html",
+        "width": 460,
+        "height": 440,
+        "resizable": false,
+        "decorations": true,
+        "transparent": true,
+        "visible": false
       }
     ],
     "trayIcon": {

@@ -6,14 +6,17 @@
 //! (docs/mutter-project-plan.md Section 3, Section 8).
 //!
 //! Schema migrations use `rusqlite_migration` with a backup-then-migrate
-//! failure path: before running migrations, the existing DB file (if any) is
-//! copied to a timestamped backup; if migration then fails, `open()` returns
-//! `HistoryError::MigrationFailed` naming that backup path rather than
-//! silently launching against a half-migrated schema (Section 11, Test
-//! Issue 6). The backup happens unconditionally when a DB file already
-//! exists, even if it turns out no migration was actually needed — a
-//! deliberately simple, always-safe rule over a more precise "only back up
-//! if a migration will actually run" check.
+//! failure path: before running a migration that will actually change the
+//! schema, the existing DB file is copied to a timestamped backup; if the
+//! migration then fails, `open()` returns `HistoryError::MigrationFailed`
+//! naming that backup path rather than silently launching against a
+//! half-migrated schema (Section 11, Test Issue 6). The backup — and the
+//! migration call itself — is skipped whenever the DB is already at the
+//! latest schema version, so a normal app launch on an up-to-date DB
+//! doesn't leave behind a new backup file every time (it used to, and that
+//! meant unbounded backup accumulation over weeks of daily use — a real
+//! bug caught by watching backups pile up in
+//! `~/Library/Application Support/Mutter/` during dev testing).
 //!
 //! Dashboard aggregates (time-saved, total count, WPM average) are
 //! maintained as running totals updated on each insert, not recomputed by
@@ -74,7 +77,32 @@ impl HistoryStore {
     }
 
     fn open_at(db_path: &Path) -> Result<Self, HistoryError> {
-        let backup_path = if db_path.exists() {
+        let db_existed = db_path.exists();
+        let mut conn =
+            Connection::open(db_path).map_err(|e| HistoryError::Database(e.to_string()))?;
+
+        // Only worth a pre-migration backup (and the migration call at all)
+        // when a migration will actually run. Without this check, every
+        // single normal app launch — not just the rare schema-upgrade one —
+        // would copy the whole DB file, accumulating one backup per launch
+        // forever. An unreadable/corrupt existing file (current_version
+        // erroring) still falls through to the backup+migrate path below,
+        // since that's exactly the case the backup exists to protect.
+        let needs_migration = if db_existed {
+            match migrations::migrations().current_version(&conn) {
+                Ok(v) => usize::from(&v) < migrations::LATEST_VERSION,
+                Err(_) => true,
+            }
+        } else {
+            true
+        };
+        if !needs_migration {
+            return Ok(Self {
+                conn: Mutex::new(conn),
+            });
+        }
+
+        let backup_path = if db_existed {
             let backup_secs = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -87,9 +115,6 @@ impl HistoryStore {
         } else {
             None
         };
-
-        let mut conn =
-            Connection::open(db_path).map_err(|e| HistoryError::Database(e.to_string()))?;
 
         if let Err(e) = migrations::migrations().to_latest(&mut conn) {
             tracing::error!(error = %e, "history db migration failed");
@@ -382,6 +407,31 @@ mod tests {
         std::fs::remove_file(&path).ok();
     }
 
+    /// Section 11's failure contract: a migration failure must back up the
+    /// existing DB file (to a real, named path) and return
+    /// `HistoryError::MigrationFailed` rather than silently launching
+    /// against a half-migrated schema. Simulated here with a file that
+    /// isn't a valid SQLite database at all — `to_latest` fails the same
+    /// way a genuinely corrupted or half-migrated DB would.
+    #[test]
+    fn migration_failure_backs_up_existing_db_and_names_the_backup_path() {
+        let path = temp_db_path();
+        std::fs::write(&path, b"not a sqlite database").unwrap();
+
+        let backup_path = match HistoryStore::open_at(&path) {
+            Err(HistoryError::MigrationFailed(backup)) => backup,
+            Err(other) => panic!("expected MigrationFailed, got {other:?}"),
+            Ok(_) => panic!("expected MigrationFailed, opened successfully instead"),
+        };
+        assert!(
+            std::path::Path::new(&backup_path).exists(),
+            "backup file named in the error should actually exist on disk"
+        );
+
+        std::fs::remove_file(&path).ok();
+        std::fs::remove_file(&backup_path).ok();
+    }
+
     #[test]
     fn reopening_an_up_to_date_db_does_not_lose_data() {
         let path = temp_db_path();
@@ -394,15 +444,32 @@ mod tests {
             let metrics = store.metrics(DEFAULT_TYPING_WPM).unwrap();
             assert_eq!(metrics.total_transcriptions, 1);
         }
-        // Reopening an existing DB creates a backup file — clean up both.
         std::fs::remove_file(&path).ok();
-        let mut entries = std::fs::read_dir(path.parent().unwrap()).unwrap();
-        while let Some(Ok(e)) = entries.next() {
-            let name = e.file_name();
-            let name = name.to_string_lossy();
-            if name.starts_with(path.file_name().unwrap().to_str().unwrap()) {
-                std::fs::remove_file(e.path()).ok();
-            }
-        }
+    }
+
+    /// Regression test for the unbounded-backup-accumulation bug: reopening
+    /// a DB that's already at the latest schema version must NOT create a
+    /// new backup file every time — only an actual migration should.
+    #[test]
+    fn reopening_an_up_to_date_db_does_not_create_a_backup_file() {
+        let path = temp_db_path();
+        HistoryStore::open_at(&path).unwrap();
+        HistoryStore::open_at(&path).unwrap();
+
+        let backup_exists = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .any(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with(path.file_name().unwrap().to_str().unwrap())
+                    && e.path() != path
+            });
+        assert!(
+            !backup_exists,
+            "reopening an up-to-date DB should not create a backup file"
+        );
+
+        std::fs::remove_file(&path).ok();
     }
 }

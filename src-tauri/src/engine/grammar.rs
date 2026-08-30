@@ -2,10 +2,14 @@
 //! fully offline, zero extra model weight. Always-on in the default
 //! pipeline, unlike Option B (a local-LLM "clean up with AI" pass), which
 //! Section 5 explicitly scopes as a per-transcript, user-triggered action
-//! rather than always-on middleware. Option B is NOT implemented here —
-//! wiring a local LLM is a real scope/cost decision the plan says to
-//! confirm with the user before Phase 3, not to commit silently by building
-//! it anyway.
+//! rather than always-on middleware.
+//!
+//! **Decision (2026-08-29, user-confirmed):** Option A only, for v1. Option
+//! B is explicitly deferred — logged as a possible future update, not
+//! committed to — pending real-world signal from Phase 8 dogfooding on
+//! whether raw Whisper + Option A output actually needs smarter cleanup.
+//! Do not build Option B speculatively; re-raise it with the user if that
+//! signal shows up.
 //!
 //! Deliberately conservative: normalizes whitespace, capitalizes the first
 //! letter, and ensures terminal punctuation. It does not attempt real

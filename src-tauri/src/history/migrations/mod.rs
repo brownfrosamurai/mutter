@@ -4,6 +4,13 @@
 
 use rusqlite_migration::{Migrations, M};
 
+/// Number of `M::up(...)` entries in [`migrations`] — used by
+/// `history::open_at` to decide whether a migration will actually run
+/// before paying the cost of a pre-migration backup copy. Bump this
+/// alongside adding a new migration; `migration_set_validates` below
+/// doesn't catch a mismatch, so it's a manual invariant.
+pub const LATEST_VERSION: usize = 1;
+
 /// `aggregates` is a singleton row (Section 8's running-aggregate design —
 /// time-saved/total-count/WPM are updated on each `history` insert, not
 /// recomputed by scanning the whole table on every dashboard open).
