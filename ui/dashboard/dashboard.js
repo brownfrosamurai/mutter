@@ -210,5 +210,39 @@ function initTitlebarControls() {
 }
 initTitlebarControls();
 
+// Manual QA tool (docs/mutter-project-plan.md Section 15's T12, Phase 8's
+// manual QA matrix) — see index.html's comment above #debug-inject-text.
+// Clicking the button focuses THIS window, but the whole point is to insert
+// into some OTHER focused surface (a terminal, a text field elsewhere) — so
+// this counts down first, giving time to click over to the real target
+// before injection.rs actually runs.
+function initDebugInjection() {
+  const btn = document.getElementById("debug-inject-btn");
+  const result = document.getElementById("debug-inject-result");
+  if (!btn) return;
+
+  const COUNTDOWN_SECS = 3;
+
+  btn.addEventListener("click", async () => {
+    const text = document.getElementById("debug-inject-text").value;
+    btn.disabled = true;
+
+    for (let remaining = COUNTDOWN_SECS; remaining > 0; remaining--) {
+      result.textContent = `Click your target window now — inserting in ${remaining}…`;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    try {
+      const method = await window.__TAURI__.core.invoke("debug_test_injection", { text });
+      result.textContent = `Inserted via ${method}`;
+    } catch (err) {
+      result.textContent = `Failed: ${err}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+initDebugInjection();
+
 // Initial load — the dashboard opens on the Metrics tab.
 loadMetrics();

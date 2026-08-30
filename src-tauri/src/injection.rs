@@ -54,6 +54,7 @@ pub enum InjectionError {
     FallbackFailed(String),
 }
 
+#[derive(Debug)]
 pub enum InjectionMethod {
     /// Direct `AXSelectedText` set on the focused element.
     Accessibility,

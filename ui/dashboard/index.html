@@ -148,6 +148,31 @@
             <label>Engine</label>
             <span class="hint">Whisper (small) — Apple Speech pending Phase 0 benchmark</span>
           </div>
+
+          <!--
+            Manual QA tool, not a user-facing feature — the debug_test_injection
+            command is a no-op in release builds (see lib.rs). Exists to test
+            injection.rs's AX/clipboard-fallback path directly against a real
+            focused surface (plain text field, rich-text editor, terminal)
+            without needing a real hotkey press + real speech first — see
+            docs/mutter-project-plan.md Section 15's T12 and the Phase 8
+            manual QA matrix, both of which need exactly this.
+          -->
+          <section class="dash-section">
+            <h2>Manual QA: Test Injection (dev only)</h2>
+            <p class="hint">
+              Focus a text field, rich-text editor, or terminal, then insert
+              the text below at the cursor — tests injection.rs directly,
+              independent of mic capture or transcription.
+            </p>
+            <textarea id="debug-inject-text" rows="3" placeholder="Line one.&#10;Line two.&#10;Line three — checks multi-line/bracketed-paste handling in a terminal.">Line one.
+Line two.
+Line three — checks multi-line/bracketed-paste handling in a terminal.</textarea>
+            <div class="debug-inject-row">
+              <button id="debug-inject-btn" type="button">Insert at cursor</button>
+              <span class="hint" id="debug-inject-result"></span>
+            </div>
+          </section>
         </section>
       </main>
     </div>

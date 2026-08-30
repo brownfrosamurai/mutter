@@ -179,6 +179,33 @@ fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
     state.inner().0.clone()
 }
 
+/// Manual QA tool for the injection path (Section 11 / Phase 8's manual QA
+/// matrix, and Section 15's T12: "validate terminal text-injection... before
+/// Phase 3 begins"). T12 needs a human — it depends on real Accessibility
+/// permission and a focused text surface, neither of which an agent can
+/// grant or aim itself at. This lets a human insert arbitrary text at the
+/// cursor without running the full mic-capture-transcribe pipeline first, so
+/// the injection mechanism itself (AX vs. clipboard-fallback, multi-line and
+/// bracketed-paste behavior in a real terminal) can be exercised directly
+/// and repeatedly — independent of whether real speech or ASR is involved,
+/// which is exactly what T12 is actually worried about.
+///
+/// A runtime check rather than `#[cfg(debug_assertions)]` on the command
+/// itself/its `generate_handler!` entry — simpler than relying on that
+/// macro supporting cfg-gated argument lists, and the cost of leaving the
+/// dead branch compiled into a release build is negligible.
+#[tauri::command]
+async fn debug_test_injection(text: String) -> Result<String, String> {
+    if !cfg!(debug_assertions) {
+        return Err("debug_test_injection is disabled in release builds".into());
+    }
+    tokio::task::spawn_blocking(move || injection::insert_at_cursor(&text))
+        .await
+        .map_err(|e| format!("injection task panicked: {e}"))?
+        .map(|method| format!("{method:?}"))
+        .map_err(|e| e.to_string())
+}
+
 pub fn run() {
     logging::init();
 
@@ -193,7 +220,8 @@ pub fn run() {
             copy_history_text,
             get_permission_status,
             quit_app,
-            get_recovery_info
+            get_recovery_info,
+            debug_test_injection
         ])
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
