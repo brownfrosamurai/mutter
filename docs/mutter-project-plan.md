@@ -294,6 +294,8 @@ Two things, in order:
 1. **Before any code:** run the Phase 0 engine benchmark yourself, informally — try Apple's built-in dictation (System Settings → Keyboard → Dictation) against all six languages, especially Yoruba, and note where it already feels "blazing fast" and accurate versus where it clearly struggles. This costs zero build time and directly de-risks the biggest open question in this plan (Section 6) before a single line of Rust exists.
 2. **Then:** spend 30-60 minutes reading WhisperDictation's or mac-whisper's hotkey/text-injection source, as in the first draft — still cheap insurance against rebuilding solved plumbing, regardless of how large the rest of the app has grown.
 
+**Status, 2026-08-30:** item 1 is partially satisfiable by machine after all, for English — see CLAUDE.md's Phase 0 entry and `src-tauri/tests/language_benchmark.rs`: real Whisper Small-vs-Medium numbers now exist (100% accuracy both tiers, Small 3x faster, on a clean-audio proxy). Yoruba remains exactly this section's assignment — no TTS voice exists to synthesize it, so it needs you, with a real recording or your own ear against Apple's dictation, same as originally written.
+
 ---
 
 ## 18. What I Noticed About How You Think
