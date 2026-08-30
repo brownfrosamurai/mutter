@@ -360,6 +360,68 @@ body {
   color: var(--text-secondary);
 }
 
+.hotkey-row {
+  border-bottom: none;
+  padding-bottom: var(--space-1);
+}
+
+.hotkey-status {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--glass-border);
+  min-height: 1em;
+}
+
+.hotkey-status.error {
+  color: var(--danger);
+}
+
+.hotkey-status.success {
+  color: var(--success);
+}
+
+.hotkey-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hotkey-input {
+  width: 220px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-small);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--text-xs);
+}
+
+.hotkey-input:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 1px;
+}
+
+.hotkey-save-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.hotkey-save-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hotkey-save-btn:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 2px;
+}
+
 #debug-inject-text {
   width: 100%;
   margin-top: var(--space-2);

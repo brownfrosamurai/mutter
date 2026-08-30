@@ -65,7 +65,7 @@
     "macOS": {
       "minimumSystemVersion": "14.0",
       "entitlements": null,
-      "signingIdentity": "-"
+      "signingIdentity": "Mutter Dev Signing"
     }
   },
   "plugins": {

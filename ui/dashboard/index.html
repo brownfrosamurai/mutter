@@ -124,14 +124,25 @@
         </section>
 
         <section id="panel-settings" class="panel">
-          <div class="setting-row">
-            <label>Mic-dictation hotkey</label>
-            <span class="hint">⌘⇧Space — not yet user-configurable</span>
+          <div class="setting-row hotkey-row">
+            <label for="hotkey-mic">Mic-dictation hotkey</label>
+            <div class="hotkey-editor">
+              <input type="text" id="hotkey-mic" class="hotkey-input" spellcheck="false" />
+              <button type="button" class="hotkey-save-btn" data-mode="mic">Save</button>
+            </div>
           </div>
-          <div class="setting-row">
-            <label>System-audio hotkey</label>
-            <span class="hint">⌘⇧M — not yet user-configurable</span>
+          <p class="hint hotkey-status" id="hotkey-mic-status"></p>
+          <div class="setting-row hotkey-row">
+            <label for="hotkey-system-audio">System-audio hotkey</label>
+            <div class="hotkey-editor">
+              <input type="text" id="hotkey-system-audio" class="hotkey-input" spellcheck="false" />
+              <button type="button" class="hotkey-save-btn" data-mode="system_audio">Save</button>
+            </div>
           </div>
+          <p class="hint hotkey-status" id="hotkey-system-audio-status"></p>
+          <p class="hint">
+            Format: modifiers joined with "+", e.g. <code>CmdOrCtrl+Shift+Space</code>.
+          </p>
           <div class="setting-row">
             <label>Microphone</label>
             <span class="hint" id="permission-mic">Checking…</span>

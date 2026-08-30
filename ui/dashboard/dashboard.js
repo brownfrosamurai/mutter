@@ -21,7 +21,10 @@ document.querySelectorAll(".nav-btn[data-tab]").forEach((btn) => {
 
     if (btn.dataset.tab === "metrics") loadMetrics();
     if (btn.dataset.tab === "history") loadHistory();
-    if (btn.dataset.tab === "settings") loadPermissionStatus();
+    if (btn.dataset.tab === "settings") {
+      loadPermissionStatus();
+      loadHotkeySettings();
+    }
   });
 });
 
@@ -47,6 +50,45 @@ async function loadPermissionStatus() {
     console.warn("[dashboard] get_permission_status failed", err);
   }
 }
+
+async function loadHotkeySettings() {
+  const tauri = window.__TAURI__;
+  if (!tauri) return;
+  try {
+    const settings = await tauri.core.invoke("get_settings");
+    document.getElementById("hotkey-mic").value = settings.mic_hotkey;
+    document.getElementById("hotkey-system-audio").value = settings.system_audio_hotkey;
+  } catch (err) {
+    console.warn("[dashboard] get_settings failed", err);
+  }
+}
+
+function initHotkeyEditors() {
+  document.querySelectorAll(".hotkey-save-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const mode = btn.dataset.mode;
+      const input = document.getElementById(mode === "mic" ? "hotkey-mic" : "hotkey-system-audio");
+      const status = document.getElementById(`hotkey-${mode === "mic" ? "mic" : "system-audio"}-status`);
+      const shortcut = input.value.trim();
+
+      status.textContent = "";
+      status.classList.remove("error", "success");
+      btn.disabled = true;
+
+      try {
+        await window.__TAURI__.core.invoke("set_hotkey", { mode, shortcut });
+        status.textContent = `Saved — ${shortcut} is now active.`;
+        status.classList.add("success");
+      } catch (err) {
+        status.textContent = `Failed: ${err}`;
+        status.classList.add("error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+initHotkeyEditors();
 
 function formatMinutes(minutes) {
   const sign = minutes < 0 ? "-" : "";

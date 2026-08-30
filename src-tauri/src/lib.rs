@@ -8,8 +8,9 @@ pub mod logging;
 pub mod paths;
 pub mod permissions;
 pub mod session;
+pub mod settings;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tauri::menu::MenuBuilder;
 use tauri::Manager;
@@ -179,6 +180,75 @@ fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
     state.inner().0.clone()
 }
 
+#[tauri::command]
+fn get_settings(state: tauri::State<Mutex<settings::AppSettings>>) -> settings::AppSettings {
+    state
+        .inner()
+        .lock()
+        .expect("settings lock poisoned")
+        .clone()
+}
+
+/// Backs the dashboard's hotkey-configuration rows (Section 4: "hotkey
+/// configuration (separate bindings for mic-dictation mode and system-audio
+/// mode)"). `mode` is `"mic"` or `"system_audio"` — a plain string over the
+/// wire rather than reusing `hotkey::HotkeyMode` directly, since that enum
+/// isn't (and doesn't need to be) `Deserialize`.
+#[tauri::command]
+fn set_hotkey(
+    mode: String,
+    shortcut: String,
+    app: tauri::AppHandle,
+    settings_state: tauri::State<Mutex<settings::AppSettings>>,
+    session: tauri::State<Option<session::SessionHandle>>,
+) -> Result<(), String> {
+    let Some(session_handle) = session.inner().clone() else {
+        return Err(
+            "hotkeys aren't active this session (history store failed to open at startup)".into(),
+        );
+    };
+
+    let hotkey_mode = match mode.as_str() {
+        "mic" => hotkey::HotkeyMode::MicDictation,
+        "system_audio" => hotkey::HotkeyMode::SystemAudio,
+        other => return Err(format!("unknown hotkey mode: {other}")),
+    };
+
+    let mut settings = settings_state
+        .inner()
+        .lock()
+        .expect("settings lock poisoned");
+    let (old_shortcut, other_mode_current) = match hotkey_mode {
+        hotkey::HotkeyMode::MicDictation => (
+            settings.mic_hotkey.clone(),
+            settings.system_audio_hotkey.clone(),
+        ),
+        hotkey::HotkeyMode::SystemAudio => (
+            settings.system_audio_hotkey.clone(),
+            settings.mic_hotkey.clone(),
+        ),
+    };
+
+    if shortcut == other_mode_current {
+        return Err("that shortcut is already assigned to the other hotkey".into());
+    }
+
+    hotkey::update_hotkey(&app, hotkey_mode, &old_shortcut, &shortcut, move |m| {
+        session_handle.hotkey_pressed(m);
+    })
+    .map_err(|e| e.to_string())?;
+
+    match hotkey_mode {
+        hotkey::HotkeyMode::MicDictation => settings.mic_hotkey = shortcut,
+        hotkey::HotkeyMode::SystemAudio => settings.system_audio_hotkey = shortcut,
+    }
+    settings
+        .save()
+        .map_err(|e| format!("hotkey updated but failed to persist to disk: {e}"))?;
+
+    Ok(())
+}
+
 /// Manual QA tool for the injection path (Section 11 / Phase 8's manual QA
 /// matrix, and Section 15's T12: "validate terminal text-injection... before
 /// Phase 3 begins"). T12 needs a human — it depends on real Accessibility
@@ -221,7 +291,9 @@ pub fn run() {
             get_permission_status,
             quit_app,
             get_recovery_info,
-            debug_test_injection
+            debug_test_injection,
+            get_settings,
+            set_hotkey
         ])
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
@@ -231,6 +303,7 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let app_handle = app.handle().clone();
+            let app_settings = settings::AppSettings::load();
 
             // The core loop (hotkey -> capture -> engine -> injection ->
             // history) only comes up if the history store opens cleanly.
@@ -264,9 +337,14 @@ pub fn run() {
                     );
 
                     let hotkey_handle = handle.clone();
-                    hotkey::register_hotkeys(&app_handle, move |mode| {
-                        hotkey_handle.hotkey_pressed(mode);
-                    })?;
+                    hotkey::register_hotkeys(
+                        &app_handle,
+                        &app_settings.mic_hotkey,
+                        &app_settings.system_audio_hotkey,
+                        move |mode| {
+                            hotkey_handle.hotkey_pressed(mode);
+                        },
+                    )?;
 
                     (Some(handle), Some(history), RecoveryInfo(None))
                 }
@@ -299,6 +377,7 @@ pub fn run() {
             app.manage(session_handle);
             app.manage(history_for_dashboard);
             app.manage(recovery_info);
+            app.manage(Mutex::new(app_settings));
 
             // The dashboard window is meant to persist for the app's whole
             // lifetime and be shown/hidden (via the tray's "Open Dashboard"
