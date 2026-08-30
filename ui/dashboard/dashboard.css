@@ -11,6 +11,8 @@
   --accent: #0a84ff;
   --accent-violet: #8b7cf6;
   --danger: #ff453a;
+  --warning: #ffbd2e;
+  --success: #30d158;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -51,9 +53,7 @@ body {
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid var(--glass-border);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 8px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 #shell {
@@ -142,7 +142,14 @@ body {
   overflow: hidden;
 }
 
+/* Doubles as the window's title bar — `decorations: false` in
+   tauri.conf.json removes macOS's native one entirely, so this row both
+   draws the traffic lights and is the drag handle (`data-tauri-drag-region`
+   in the HTML) for moving the window. */
 #panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   padding: var(--space-4) var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--glass-border);
 }
@@ -151,6 +158,63 @@ body {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 600;
+}
+
+/* Custom traffic lights — real decorations are off, so this row is the
+   only way to close/minimize/zoom the window. Colors match macOS's actual
+   traffic-light hues (not the app's blue/violet accents) because
+   recognizability matters more than palette purity here: a red/yellow/
+   green cluster in this exact position reads as window controls at a
+   glance, anything else would need re-learning. */
+.titlebar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.traffic-light {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.traffic-light svg {
+  width: 7px;
+  height: 7px;
+  opacity: 0;
+  color: rgba(0, 0, 0, 0.55);
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+/* Native macOS traffic lights only reveal their glyphs when the whole
+   cluster is hovered, not per-button — matched here for the same
+   muscle-memory reason as the color choice above. */
+.titlebar-controls:hover .traffic-light svg {
+  opacity: 1;
+}
+
+.traffic-light:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 2px;
+}
+
+.traffic-close {
+  background: var(--danger);
+}
+
+.traffic-minimize {
+  background: var(--warning);
+}
+
+.traffic-maximize {
+  background: var(--success);
 }
 
 #panels {

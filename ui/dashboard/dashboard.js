@@ -191,5 +191,24 @@ document.getElementById("quit-btn").addEventListener("click", () => {
   window.__TAURI__?.core.invoke("quit_app");
 });
 
+// Custom titlebar controls (tauri.conf.json has decorations: false for this
+// window — see index.html's #panel-header comment) — window.__TAURI__.window
+// is core, not a plugin, so this needs no extra Cargo dependency.
+function initTitlebarControls() {
+  const tauri = window.__TAURI__;
+  if (!tauri) return;
+  const appWindow = tauri.window.getCurrentWindow();
+
+  // Hide, not close: this window is reused for the app's lifetime (shown
+  // again via the tray's "Open Dashboard"), matching how the tray/toggle
+  // hotkey already show/hide the pill rather than destroying it. lib.rs
+  // also intercepts the native CloseRequested event the same way, as a
+  // fallback for any close path other than this button (e.g. Cmd+W).
+  document.getElementById("win-close").addEventListener("click", () => appWindow.hide());
+  document.getElementById("win-minimize").addEventListener("click", () => appWindow.minimize());
+  document.getElementById("win-maximize").addEventListener("click", () => appWindow.toggleMaximize());
+}
+initTitlebarControls();
+
 // Initial load — the dashboard opens on the Metrics tab.
 loadMetrics();

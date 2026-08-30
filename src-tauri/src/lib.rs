@@ -272,6 +272,26 @@ pub fn run() {
             app.manage(history_for_dashboard);
             app.manage(recovery_info);
 
+            // The dashboard window is meant to persist for the app's whole
+            // lifetime and be shown/hidden (via the tray's "Open Dashboard"
+            // and this window's own custom close button — see dashboard.js),
+            // never actually destroyed — there's no code path that recreates
+            // it once gone. Without this, the default CloseRequested
+            // behavior would destroy it on the first Cmd+W (or, before the
+            // custom titlebar existed, the native red traffic light), and
+            // "Open Dashboard" would silently find nothing to show for the
+            // rest of the session. No-ops harmlessly if the window was
+            // already closed above (recovery mode).
+            if let Some(dashboard) = app.get_webview_window("dashboard") {
+                let dashboard_for_hide = dashboard.clone();
+                dashboard.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = dashboard_for_hide.hide();
+                    }
+                });
+            }
+
             // tauri.conf.json's `app.trayIcon` already creates the tray
             // icon itself at startup (id "main") — this attaches the menu
             // and click handling to it.

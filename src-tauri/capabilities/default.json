@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dashboard-window-controls",
+  "description": "The dashboard window draws its own titlebar (tauri.conf.json sets decorations: false for it, see ui/dashboard/index.html's #panel-header) instead of relying on macOS's native close/minimize/zoom — these are the core window-plugin permissions its custom traffic-light buttons and drag handle need. No other window (pill, recovery) uses these; both keep either native decorations or no user-facing window chrome at all.",
+  "windows": ["dashboard"],
+  "permissions": [
+    "core:window:allow-hide",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging"
+  ]
+}

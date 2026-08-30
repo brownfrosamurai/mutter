@@ -30,9 +30,10 @@
         "width": 720,
         "height": 480,
         "resizable": true,
-        "decorations": true,
+        "decorations": false,
         "transparent": true,
-        "visible": false
+        "visible": false,
+        "shadow": false
       },
       {
         "label": "recovery",

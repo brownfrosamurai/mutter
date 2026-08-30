@@ -7,7 +7,7 @@ Two surfaces only. No design system beyond what these two surfaces need — do n
 ## Surfaces
 
 1. **The Pill** — floating, always-on-top HUD. Visible only during an active recording/transcribing/canceling cycle. States: `loading` (first use only, text-only), `listening` (mic icon + waveform + elapsed timer + pause/cancel controls, no status text), `transcribing` (spinner + status + model subtext), `canceling` (danger-colored icon + status), `done` (success-colored icon + status). Only one state's elements are visible at a time — see `pill.css`'s per-state rules.
-2. **Dashboard/Settings window** — opened from the menu-bar icon. Metrics, history, hotkey config, language, engine selection, permissions, Quit. Uses the OS's native title bar/traffic lights (`decorations: true` in `tauri.conf.json`) rather than custom-drawn ones — only the Pill draws its own chrome.
+2. **Dashboard/Settings window** — opened from the menu-bar icon. Metrics, history, hotkey config, language, engine selection, permissions, Quit. Draws its own titlebar (`decorations: false` in `tauri.conf.json`, `shadow: false` to match) — custom traffic-light close/minimize/zoom buttons integrated directly into `#panel-header` next to the panel title, not macOS's native ones, so both surfaces now draw their own chrome. The close button hides the window rather than destroying it (it's reused for the app's lifetime, reopened via the tray's "Open Dashboard"); `lib.rs` intercepts the native `CloseRequested` event the same way as a fallback for any other close vector (e.g. Cmd+W).
 
 Both share the same visual language below. Neither is a "big app window" — see Layout.
 
@@ -24,8 +24,9 @@ Dark-leaning glassmorphism (frosted glass reads better on a translucent dark bas
 | `--text-secondary` | `rgba(255, 255, 255, 0.48)` | Secondary text, timestamps, hints |
 | `--accent` | `#0A84FF` | macOS system blue — transcribing spinner, primary links/buttons |
 | `--accent-violet` | `#8B7CF6` | Mic icon + listening waveform, active sidebar nav icon — kept distinct from `--accent` so "recording" reads differently from "processing" at a glance |
-| `--danger` | `#FF453A` | Cancel state (icon + text), cancel countdown, error markers (`[transcription failed]`) |
-| `--success` | `#30D158` | Done/confirmation state |
+| `--danger` | `#FF453A` | Cancel state (icon + text), cancel countdown, error markers (`[transcription failed]`), the dashboard's custom close traffic light |
+| `--success` | `#30D158` | Done/confirmation state, the dashboard's custom zoom/maximize traffic light |
+| `--warning` | `#FFBD2E` | Dashboard-only: the custom minimize traffic light. Matches macOS's actual traffic-light yellow exactly — recognizability as a window control matters more than palette purity for this one use |
 
 No custom color beyond this table without updating it here first.
 

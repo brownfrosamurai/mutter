@@ -9,9 +9,12 @@
   <!--
     Settings-window layout, not a dashboard-app layout — see ../../DESIGN.md
     "Layout principles". Floating icon sidebar navigates Metrics / History /
-    Settings, matched against a reference mockup; native window decorations
-    (tauri.conf.json's `decorations: true` for this window) supply the
-    title bar and traffic lights, so the content card draws neither.
+    Settings, matched against a reference mockup; tauri.conf.json sets
+    `decorations: false` for this window, so #panel-header below draws its
+    own titlebar — traffic lights integrated with the panel title — and
+    doubles as the drag handle via `data-tauri-drag-region`. The window
+    permissions this needs (hide/minimize/toggleMaximize/startDragging)
+    live in src-tauri/capabilities/default.json, scoped to this window only.
 
     Metrics/Languages/History are wired to real data via dashboard.js's
     Tauri commands (Phase 5). The Latency section stays a placeholder
@@ -53,7 +56,18 @@
     </nav>
 
     <div id="app" class="glass-panel">
-      <header id="panel-header">
+      <header id="panel-header" data-tauri-drag-region>
+        <div class="titlebar-controls">
+          <button class="traffic-light traffic-close" id="win-close" aria-label="Close">
+            <svg viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
+          </button>
+          <button class="traffic-light traffic-minimize" id="win-minimize" aria-label="Minimize">
+            <svg viewBox="0 0 8 8" fill="none"><path d="M1 4h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
+          </button>
+          <button class="traffic-light traffic-maximize" id="win-maximize" aria-label="Maximize">
+            <svg viewBox="0 0 8 8" fill="none"><path d="M1.5 4.5v2h2M6.5 3.5v-2h-2M1.5 6.5l2.4-2.4M6.5 1.5l-2.4 2.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+        </div>
         <h1 id="panel-title">Stats</h1>
       </header>
 
