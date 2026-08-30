@@ -189,6 +189,16 @@ impl TranscriptionEngine for WhisperEngine {
                 // "en" back but an empty `text` until this was removed.
                 params.set_language(None);
                 params.set_translate(false);
+                // whisper.cpp defaults n_threads to 4 regardless of the
+                // machine — leaving real cores idle on anything with more
+                // performance cores than that (every current Apple Silicon
+                // Mac). Metal (see Cargo.toml) offloads the matmuls, but
+                // mel-spectrogram extraction and CPU-side ops still scale
+                // with this.
+                let n_threads = std::thread::available_parallelism()
+                    .map(|n| n.get() as i32)
+                    .unwrap_or(4);
+                params.set_n_threads(n_threads);
                 params.set_print_special(false);
                 params.set_print_progress(false);
                 params.set_print_realtime(false);

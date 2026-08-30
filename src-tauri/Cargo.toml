@@ -34,8 +34,14 @@ cpal = "0.15"
 
 # Speech-to-text engine (whisper.cpp bindings). Phase 0 spike (Section 14)
 # resolved: whisper-rs's native whisper.cpp/ggml build compiles cleanly on
-# this toolchain — no CLI shell-out or raw FFI fallback needed.
-whisper-rs = "0.12"
+# this toolchain — no CLI shell-out or raw FFI fallback needed. `metal`
+# turns on whisper.cpp's Metal GPU backend at build time — without it the
+# crate defaults to CPU-only inference (whisper-rs's own `default = []`),
+# which is why enabling it is the highest-leverage speed lever available:
+# `WhisperContextParameters::default()`'s `use_gpu` is literally
+# `cfg!(feature = "_gpu")`, so turning this feature on is enough — no code
+# change needed in engine/whisper.rs to pick it up.
+whisper-rs = { version = "0.12", features = ["metal"] }
 tokio = { version = "1", features = ["rt", "sync", "macros", "time"] }
 
 # Local history storage
