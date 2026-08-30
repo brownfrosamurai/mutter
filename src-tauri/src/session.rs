@@ -648,9 +648,37 @@ async fn start_listening<R: Runtime>(app: &AppHandle<R>, capture: &CaptureHandle
 
 fn show_pill<R: Runtime>(app: &AppHandle<R>) {
     if let Some(win) = app.get_webview_window(PILL_WINDOW) {
+        position_pill_above_dock(&win);
         let _ = win.show();
     }
     emit_state(app, "listening");
+}
+
+/// Bottom-center, clear of the macOS Dock — recomputed on every show
+/// rather than once at startup, since a monitor's work area can change
+/// between sessions (external display connect/disconnect, Dock resize,
+/// Dock auto-hide toggled). `Monitor::work_area()` already excludes both
+/// the Dock and the menu bar — it's a thin wrapper over `NSScreen`'s
+/// `visibleFrame` (see tauri-runtime-wry's macOS monitor impl) — so this
+/// needs no native shim of its own, unlike the ScreenCaptureKit/permissions
+/// integrations that genuinely require one.
+const PILL_BOTTOM_MARGIN: i32 = 16;
+
+fn position_pill_above_dock<R: Runtime>(win: &tauri::WebviewWindow<R>) {
+    let Ok(Some(monitor)) = win.current_monitor().or_else(|_| win.primary_monitor()) else {
+        return;
+    };
+    let Ok(win_size) = win.outer_size() else {
+        return;
+    };
+    let work_area = monitor.work_area();
+
+    let x = work_area.position.x + (work_area.size.width as i32 - win_size.width as i32) / 2;
+    let y = work_area.position.y + work_area.size.height as i32
+        - win_size.height as i32
+        - PILL_BOTTOM_MARGIN;
+
+    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
 }
 
 fn hide_pill<R: Runtime>(app: &AppHandle<R>) {
