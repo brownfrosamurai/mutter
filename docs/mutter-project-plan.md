@@ -128,6 +128,8 @@ Your spec requires more than raw ASR output: *"it'll fix your punctuation and it
 
 **Checked during eng review:** the primary named use case (dictating to AI coding agents) needs precise technical vocabulary preserved, not paraphrased — an always-on LLM cleanup pass would risk corrupting exactly that. The user-triggered-only design above already contains this risk (you'd simply never trigger cleanup on agent-directed dictation) — confirmed as sufficient, no change needed.
 
+**Status, 2026-08-30: Option B built, and NOT per the recommendation above.** The user explicitly asked for a Settings-toggleable, always-on Option B rather than the per-transcript-triggered design — after being shown this exact eng-review risk paragraph and choosing always-on anyway. Built on `candle` (this section's own alternative suggestion), Qwen2.5-0.5B-Instruct GGUF. `GrammarPipeline` (`engine/pipeline.rs`) runs Option A first always, then Option B on top only when the toggle is on, with a hard fallback to Option A's output if Option B errors. Off by default, so the risk this paragraph names is opt-in, not forced — but once a user opts in, it does apply on every transcript including agent-directed dictation, exactly as warned above.
+
 ---
 
 ## 6. Model & Language Plan

@@ -30,9 +30,12 @@ Section 6) — Yoruba was the language most likely to change that call. With
 it parked, the fork is resolved for now: Whisper already won for
 English (100% accuracy), so `AppleSpeechEngine` is not being built.
 
-## Grammar cleanup Option B (local-LLM cleanup) — deferred, not parked
+## DONE — Grammar cleanup Option B (local-LLM cleanup)
 
-Still pending real signal from Phase 8 daily-use dogfooding on whether
-rule-based cleanup (Option A, shipped) is actually insufficient. Unaffected
-by the Yoruba decision above — revisit once there's dogfooding evidence
-either way.
+Built 2026-08-30 (`engine/llm_cleanup.rs`, `engine/pipeline.rs`), ahead of
+the Phase 8 dogfooding signal the 2026-08-29 decision was waiting for — at
+the user's explicit request, not because that signal arrived. See
+`CLAUDE.md`'s Grammar cleanup entry for the full story (including a real
+GGML linker collision this feature had to work around by switching from
+`llama-cpp-2` to `candle`). Toggle lives in the dashboard Settings panel,
+off by default.
