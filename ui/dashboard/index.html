@@ -112,19 +112,27 @@
         <section id="panel-settings" class="panel">
           <div class="setting-row">
             <label>Mic-dictation hotkey</label>
-            <span class="hint">Not yet configurable (Phase 1)</span>
+            <span class="hint">⌘⇧Space — not yet user-configurable</span>
           </div>
           <div class="setting-row">
             <label>System-audio hotkey</label>
-            <span class="hint">Not yet configurable (Phase 4)</span>
+            <span class="hint">⌘⇧M — capture not implemented until Phase 4</span>
           </div>
           <div class="setting-row">
-            <label>Permissions</label>
-            <span class="hint">Mic / Accessibility / Screen Recording — not yet wired (Phase 1/4)</span>
+            <label>Microphone</label>
+            <span class="hint" id="permission-mic">Checking…</span>
+          </div>
+          <div class="setting-row">
+            <label>Accessibility</label>
+            <span class="hint" id="permission-accessibility">Checking…</span>
+          </div>
+          <div class="setting-row">
+            <label>Screen Recording</label>
+            <span class="hint" id="permission-system-audio">Checking…</span>
           </div>
           <div class="setting-row">
             <label>Engine</label>
-            <span class="hint">Whisper vs. Apple Speech — pending Phase 0 benchmark</span>
+            <span class="hint">Whisper (small) — Apple Speech pending Phase 0 benchmark</span>
           </div>
         </section>
       </main>

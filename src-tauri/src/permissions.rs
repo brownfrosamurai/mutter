@@ -71,6 +71,74 @@ impl<T> Default for PermissionGate<T> {
     }
 }
 
+// --- Real OS-backed status checks ---
+//
+// One `refresh()` per kind rather than a generic dispatch — `T` carries no
+// data to dispatch on (it's a zero-sized marker), and each permission
+// family's underlying OS API is genuinely different (AVFoundation,
+// ApplicationServices' AX API, CoreGraphics' screen-capture preflight).
+// Adding a fourth family per the module doc's own framing is still "one new
+// marker type plus one `PermissionGate<NewKind>` instantiation" — this is
+// just where that instantiation's OS-specific edge lives.
+
+extern "C" {
+    /// Defined in native/permissions_shim.m. Mirrors `AVAuthorizationStatus`
+    /// exactly: 0 = NotDetermined, 1 = Restricted, 2 = Denied, 3 = Authorized.
+    fn mutter_mic_auth_status() -> i32;
+}
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    /// Plain C entry point — no Objective-C shim needed for this one.
+    fn CGPreflightScreenCaptureAccess() -> bool;
+}
+
+impl PermissionGate<Mic> {
+    /// Query the real microphone authorization status from AVFoundation and
+    /// update `self` to match. `Restricted` (parental controls/MDM, not a
+    /// user choice) maps to `Unavailable` per this module's own
+    /// distinction between "device-level problem" and "user denial".
+    pub fn refresh(&mut self) {
+        let status = unsafe { mutter_mic_auth_status() };
+        self.state = match status {
+            0 => PermissionState::NotRequested,
+            1 => PermissionState::Unavailable,
+            2 => PermissionState::Denied,
+            3 => PermissionState::Granted,
+            other => {
+                tracing::warn!(status = other, "unexpected AVAuthorizationStatus value");
+                PermissionState::Unavailable
+            }
+        };
+    }
+}
+
+impl PermissionGate<Accessibility> {
+    /// `AXIsProcessTrusted` has no third "not yet asked" state the way mic
+    /// permission does — untrusted is untrusted regardless of whether the
+    /// user has ever seen the prompt (the first `AXUIElement` call made
+    /// while untrusted, in injection.rs, is itself what triggers it).
+    pub fn refresh(&mut self) {
+        let trusted = unsafe { accessibility_sys::AXIsProcessTrusted() };
+        self.state = if trusted {
+            PermissionState::Granted
+        } else {
+            PermissionState::Denied
+        };
+    }
+}
+
+impl PermissionGate<SystemAudio> {
+    pub fn refresh(&mut self) {
+        let granted = unsafe { CGPreflightScreenCaptureAccess() };
+        self.state = if granted {
+            PermissionState::Granted
+        } else {
+            PermissionState::Denied
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,5 +167,31 @@ mod tests {
 
         gate.set_state(PermissionState::Unavailable);
         assert!(gate.needs_recovery_ui());
+    }
+
+    // Smoke tests only — the actual `PermissionState` these produce depends
+    // on the CI/dev machine's real TCC state, which these tests
+    // deliberately don't assert a specific value for. What they do verify:
+    // the FFI calls into the native shim/frameworks don't crash and always
+    // leave the gate in a valid (non-panicking-to-construct) state.
+    #[test]
+    fn mic_refresh_does_not_panic() {
+        let mut gate: PermissionGate<Mic> = PermissionGate::new();
+        gate.refresh();
+        let _ = gate.state();
+    }
+
+    #[test]
+    fn accessibility_refresh_does_not_panic() {
+        let mut gate: PermissionGate<Accessibility> = PermissionGate::new();
+        gate.refresh();
+        let _ = gate.state();
+    }
+
+    #[test]
+    fn system_audio_refresh_does_not_panic() {
+        let mut gate: PermissionGate<SystemAudio> = PermissionGate::new();
+        gate.refresh();
+        let _ = gate.state();
     }
 }

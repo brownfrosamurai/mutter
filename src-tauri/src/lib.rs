@@ -121,6 +121,41 @@ fn copy_history_text(text: String) -> Result<(), String> {
     injection::copy_to_clipboard(&text).map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+struct PermissionStatusDto {
+    mic: &'static str,
+    accessibility: &'static str,
+    system_audio: &'static str,
+}
+
+fn permission_state_label(state: permissions::PermissionState) -> &'static str {
+    match state {
+        permissions::PermissionState::NotRequested => "not_requested",
+        permissions::PermissionState::Denied => "denied",
+        permissions::PermissionState::Granted => "granted",
+        permissions::PermissionState::Unavailable => "unavailable",
+    }
+}
+
+/// Backs the dashboard Settings panel's Permissions row — real OS-queried
+/// status (permissions.rs), not the "not yet wired" placeholder it started
+/// as.
+#[tauri::command]
+fn get_permission_status() -> PermissionStatusDto {
+    let mut mic = permissions::PermissionGate::<permissions::Mic>::new();
+    mic.refresh();
+    let mut accessibility = permissions::PermissionGate::<permissions::Accessibility>::new();
+    accessibility.refresh();
+    let mut system_audio = permissions::PermissionGate::<permissions::SystemAudio>::new();
+    system_audio.refresh();
+
+    PermissionStatusDto {
+        mic: permission_state_label(mic.state()),
+        accessibility: permission_state_label(accessibility.state()),
+        system_audio: permission_state_label(system_audio.state()),
+    }
+}
+
 /// Backs the dashboard sidebar's quit button. The tray menu's predefined
 /// "Quit" item (see `run()`) is the primary quit path; this is the same
 /// action reachable from the dashboard itself, per the reference mockup's
@@ -143,6 +178,7 @@ pub fn run() {
             get_language_breakdown,
             get_history_page,
             copy_history_text,
+            get_permission_status,
             quit_app
         ])
         .setup(|app| {

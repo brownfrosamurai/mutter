@@ -21,8 +21,32 @@ document.querySelectorAll(".nav-btn[data-tab]").forEach((btn) => {
 
     if (btn.dataset.tab === "metrics") loadMetrics();
     if (btn.dataset.tab === "history") loadHistory();
+    if (btn.dataset.tab === "settings") loadPermissionStatus();
   });
 });
+
+const PERMISSION_LABEL = {
+  granted: "Granted",
+  denied: "Denied — enable in System Settings",
+  not_requested: "Not yet requested",
+  unavailable: "Unavailable on this device",
+};
+
+async function loadPermissionStatus() {
+  const tauri = window.__TAURI__;
+  if (!tauri) return;
+  try {
+    const status = await tauri.core.invoke("get_permission_status");
+    document.getElementById("permission-mic").textContent =
+      PERMISSION_LABEL[status.mic] ?? status.mic;
+    document.getElementById("permission-accessibility").textContent =
+      PERMISSION_LABEL[status.accessibility] ?? status.accessibility;
+    document.getElementById("permission-system-audio").textContent =
+      PERMISSION_LABEL[status.system_audio] ?? status.system_audio;
+  } catch (err) {
+    console.warn("[dashboard] get_permission_status failed", err);
+  }
+}
 
 function formatMinutes(minutes) {
   const sign = minutes < 0 ? "-" : "";
