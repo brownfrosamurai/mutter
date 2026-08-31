@@ -15,7 +15,8 @@
 //! exactly the content that motivated this project).
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, SampleFormat, Stream};
@@ -41,6 +42,16 @@ struct SharedState {
     source_channels: u16,
     source_sample_rate: u32,
     at_cap: AtomicBool,
+    /// Set once, by the audio callback, the first time it actually runs —
+    /// this is the real "recording started" moment (device opened, stream
+    /// producing samples), which can measurably lag `start()` returning on
+    /// a slow/contended audio device. Backs the dashboard's "Recording
+    /// Latency" stat (session.rs diffs this against the hotkey-press
+    /// instant it holds). `OnceLock` rather than a `Mutex<Option<Instant>>`
+    /// because the callback runs many times per second and only the first
+    /// call's write should ever stick — `get_or_init` makes every
+    /// subsequent call a cheap no-op read instead of a lock+branch.
+    first_frame_at: OnceLock<Instant>,
 }
 
 pub struct MicCapture {
@@ -71,6 +82,14 @@ impl MicCapture {
         self.stream.is_some()
     }
 
+    /// The instant the audio callback first actually ran for the current
+    /// capture, if it's run at all yet. `None` both before `start()` and in
+    /// the (rare) case `stop()` is called before the device ever delivered
+    /// a single callback.
+    pub fn first_frame_at(&self) -> Option<Instant> {
+        self.state.as_ref()?.first_frame_at.get().copied()
+    }
+
     /// Start capturing on cpal's dedicated audio-callback thread.
     pub fn start(&mut self) -> Result<(), CaptureError> {
         let host = cpal::default_host();
@@ -91,6 +110,7 @@ impl MicCapture {
             source_channels: channels,
             source_sample_rate: sample_rate,
             at_cap: AtomicBool::new(false),
+            first_frame_at: OnceLock::new(),
         });
 
         let cap_samples = MAX_DURATION_SECS as usize * sample_rate as usize * channels as usize;
@@ -155,6 +175,7 @@ where
                 // panic (lock poisoning is the only realistic failure mode,
                 // and `expect` surfaces that loudly rather than silently
                 // dropping audio).
+                state.first_frame_at.get_or_init(Instant::now);
                 if state.at_cap.load(Ordering::Relaxed) {
                     return;
                 }

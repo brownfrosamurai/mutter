@@ -68,14 +68,22 @@ const KEYCODE_V: u16 = 9;
 /// Insert `text` at the current cursor position. Empty/whitespace-only text
 /// is the caller's responsibility to filter before calling this (Section 3
 /// — nothing is pasted, pill clears silently, on an empty transcription).
-pub fn insert_at_cursor(text: &str) -> Result<InjectionMethod, InjectionError> {
+///
+/// `restore_clipboard` (frontend-rewrite plan's `AppSettings::restore_clipboard`)
+/// only affects the clipboard-*fallback* path below — the primary
+/// Accessibility-API path (`try_ax_insert`) never touches the clipboard at
+/// all, so this parameter has no effect when that path succeeds.
+pub fn insert_at_cursor(
+    text: &str,
+    restore_clipboard: bool,
+) -> Result<InjectionMethod, InjectionError> {
     // Native FFI into ApplicationServices/AppKit — CLAUDE.md requires bridge
     // calls guarded so a panic here can never take down the whole app.
     let ax_result = std::panic::catch_unwind(|| try_ax_insert(text));
     if matches!(ax_result, Ok(Ok(()))) {
         return Ok(InjectionMethod::Accessibility);
     }
-    clipboard_fallback(text).map(|_| InjectionMethod::ClipboardFallback)
+    clipboard_fallback(text, restore_clipboard).map(|_| InjectionMethod::ClipboardFallback)
 }
 
 /// `Ok(())` only if the focused element actually accepted the text via
@@ -159,13 +167,18 @@ pub fn copy_to_clipboard(text: &str) -> Result<(), InjectionError> {
     Ok(())
 }
 
-/// Clipboard swap + synthetic Cmd+V, original clipboard plain-text contents
-/// restored afterward.
-fn clipboard_fallback(text: &str) -> Result<(), InjectionError> {
+/// Clipboard swap + synthetic Cmd+V. Original clipboard plain-text contents
+/// are restored afterward only if `restore_clipboard` is true — when false,
+/// the just-pasted text is deliberately left sitting on the clipboard
+/// (`AppSettings::restore_clipboard`, default `true` — matches this
+/// function's pre-toggle behavior exactly).
+fn clipboard_fallback(text: &str, restore_clipboard: bool) -> Result<(), InjectionError> {
     let pasteboard = NSPasteboard::generalPasteboard();
     let string_type = unsafe { NSPasteboardTypeString };
 
-    let original = pasteboard.stringForType(string_type).map(|s| s.to_string());
+    let original = restore_clipboard
+        .then(|| pasteboard.stringForType(string_type).map(|s| s.to_string()))
+        .flatten();
 
     pasteboard.clearContents();
     let ns_text = NSString::from_str(text);
@@ -177,6 +190,10 @@ fn clipboard_fallback(text: &str) -> Result<(), InjectionError> {
 
     post_cmd_v()
         .map_err(|e| InjectionError::FallbackFailed(format!("synthetic paste failed: {e}")))?;
+
+    if !restore_clipboard {
+        return Ok(());
+    }
 
     // Give the target app a moment to read the pasteboard before it's
     // swapped back — paste is not synchronous from this process's view.

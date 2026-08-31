@@ -10,6 +10,7 @@ Cargo.lock.bak
 # Node (if any build tooling is added later)
 node_modules/
 npm-debug.log*
+/frontend/dist/
 
 # macOS
 .DS_Store

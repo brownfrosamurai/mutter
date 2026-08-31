@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pill-drag",
+  "description": "The pill is draggable (ui/pill/index.html's #pill has data-tauri-drag-region, 2026-08-30, user-directed: 'make it draggable so that it can be repositioned anywhere on the screen') — this is the one core:window permission that needs, scoped to the pill window only. Separate file from capabilities/pill.json (events) and capabilities/default.json (dashboard's own window controls, which explicitly documents itself as dashboard-only) rather than folded into either, so each capability file still names exactly one concern.",
+  "windows": ["pill"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

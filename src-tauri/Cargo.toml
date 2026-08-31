@@ -91,6 +91,15 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["all
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard"] } # NSPasteboard
 tracing-appender = "0.2"
 
+# Auto-generates TypeScript types + typed invoke() wrappers directly from the
+# #[tauri::command] definitions below (frontend/src/lib/bindings.ts) — see
+# docs/mutter-project-plan.md's frontend-rewrite plan for why: this project
+# has already been bitten once by hand-maintained JS/Rust shape drift (the
+# `Transcript` struct deviation), and this removes that whole class of bug.
+specta = { version = "2.0.0-rc", features = ["derive"] }
+tauri-specta = { version = "2.0.0-rc", features = ["derive", "typescript"] }
+specta-typescript = "0.0.9"
+
 [dev-dependencies]
 # WAV decoding for the fixture-audio integration test only (tests/fixture_audio.rs)
 # — never a runtime dependency, whisper.rs takes raw f32 samples directly.

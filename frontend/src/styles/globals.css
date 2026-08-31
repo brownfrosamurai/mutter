@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens — carried over from the pre-React DESIGN.md token system.
+   Exact color-grade matching happens in the Phase D design-polish pass
+   (/frontend-design, /impeccable); this is the best-effort starting point. */
+:root {
+  /* The frost's own tint — dark, on top of whatever native vibrancy is
+     showing through underneath (pill/dashboard/recovery all set
+     windowEffects: hudWindow). Moderate alpha, not opaque: the point is a
+     dark pane of glass, not a solid card. */
+  --glass-bg: rgba(10, 10, 12, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --text-primary: rgba(255, 255, 255, 0.94);
+  --text-secondary: rgba(255, 255, 255, 0.48);
+  --danger: #ff453a;
+  --success: #30d158;
+  --warning: #ffbd2e;
+  --radius-pill: 999px;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-base: 200ms;
+
+  /* Dashboard-only (monochrome accent system — see DESIGN.md) */
+  --surface-active: rgba(255, 255, 255, 0.18);
+  --surface-filled: rgba(255, 255, 255, 0.55);
+  --focus-ring: rgba(255, 255, 255, 0.5);
+  --surface-inset: rgba(255, 255, 255, 0.04);
+  --surface-track: rgba(255, 255, 255, 0.08);
+  --surface-toggle-track: rgba(255, 255, 255, 0.12);
+  --surface-hover: rgba(255, 255, 255, 0.16);
+  --radius-panel: 14px;
+  --radius-small: 8px;
+
+  /* Reduced a step across the board, 2026-08-31, user-directed — a
+     tighter, quieter type scale reads more like a native macOS widget
+     and less like a web page. */
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 15px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Pill-only — deliberately separate from the dashboard's 4px scale (a
+     36px-tall capsule; the 4px scale's coarsest step eats a quarter of
+     that height), and its own hued accent (the dashboard is monochrome,
+     the pill isn't — a real, permanent divergence, not an inconsistency). */
+  --accent-violet: #8b7cf6;
+  --surface-control: rgba(255, 255, 255, 0.08);
+  --surface-control-hover: rgba(255, 255, 255, 0.16);
+  --pill-gap-sm: 6px;
+  --pill-gap-md: 10px;
+  --duration-fast: 120ms;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    sans-serif;
+  color: var(--text-primary);
+}
+
+#root {
+  height: 100%;
+}
+
+::selection {
+  background: var(--surface-filled);
+  color: #000;
+}
+
+/* No persistent or transient scrollbar anywhere — matches how native macOS
+   "widget" surfaces (Control Center, Notification Center) scroll. */
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+* {
+  scrollbar-width: none;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Activity chart entrance — compositor-only (transform, not height), same
+   layout-thrash-avoidance pattern already established in this app. Animates
+   to a per-bar dynamic scale via the --bar-scale custom property each bar
+   sets inline (a named @keyframes can't reference a per-element JS value
+   any other way). */
+@keyframes mutter-activity-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(var(--bar-scale, 1));
+  }
+}
+
+/* Pill waveform — compositor-only (transform, not height), matching this
+   app's established layout-thrash-avoidance pattern. Infinite + no
+   fill-mode: under prefers-reduced-motion (animation-duration forced to
+   0.01ms below), each bar completes almost instantly and reverts to its
+   inline static transform (Pill.tsx's STATIC_BAR_SCALES) — a frozen
+   waveform shape, not flat bars. */
+@keyframes mutter-pill-wave {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

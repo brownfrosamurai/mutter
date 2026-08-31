@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.femimeduna.mutter",
   "build": {
-    "frontendDist": "../ui"
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev --prefix frontend",
+    "beforeBuildCommand": "npm run build --prefix frontend"
   },
   "app": {
     "withGlobalTauri": true,
@@ -12,39 +15,58 @@
       {
         "label": "pill",
         "title": "Mutter",
-        "url": "pill/index.html",
-        "width": 220,
-        "height": 44,
+        "url": "pill.html",
+        "width": 190,
+        "height": 36,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
-        "shadow": false
+        "shadow": false,
+        "windowEffects": {
+          "effects": [
+            "hudWindow"
+          ],
+          "state": "active"
+        }
       },
       {
         "label": "dashboard",
         "title": "Mutter",
-        "url": "dashboard/index.html",
-        "width": 720,
-        "height": 480,
+        "url": "dashboard.html",
+        "width": 600,
+        "height": 460,
+        "minWidth": 420,
+        "minHeight": 320,
         "resizable": true,
         "decorations": false,
         "transparent": true,
         "visible": false,
-        "shadow": false
+        "windowEffects": {
+          "effects": [
+            "hudWindow"
+          ],
+          "state": "active"
+        }
       },
       {
         "label": "recovery",
         "title": "Mutter",
-        "url": "recovery/index.html",
+        "url": "recovery.html",
         "width": 460,
         "height": 440,
         "resizable": false,
         "decorations": true,
         "transparent": true,
-        "visible": false
+        "visible": false,
+        "windowEffects": {
+          "effects": [
+            "hudWindow"
+          ],
+          "state": "active"
+        }
       }
     ],
     "trayIcon": {
@@ -55,7 +77,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg"],
+    "targets": [
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

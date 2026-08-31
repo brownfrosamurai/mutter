@@ -9,6 +9,7 @@ pub mod paths;
 pub mod permissions;
 pub mod session;
 pub mod settings;
+pub mod vibrancy;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -25,6 +26,7 @@ const DEFAULT_ENGINE_NAME: &str = "whisper-small";
 /// cancel button (`#pill-cancel`) invokes this, since a webview button click
 /// can't itself register as a global-shortcut key-press.
 #[tauri::command]
+#[specta::specta]
 fn cancel_recording(state: tauri::State<Option<session::SessionHandle>>) -> Result<(), String> {
     match state.inner() {
         Some(handle) => {
@@ -43,21 +45,29 @@ fn cancel_recording(state: tauri::State<Option<session::SessionHandle>>) -> Resu
 // one, and this keeps `history::HistoryEntry`/`Metrics` free of a
 // dependency on `serde` they don't otherwise need.
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 struct MetricsDto {
     sessions: i64,
     words: i64,
     time_saved_minutes: f64,
     average_wpm: f64,
+    total_dictation_minutes: f64,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 struct LanguageStatDto {
     language: String,
     count: i64,
+    average_wpm: f64,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
+struct DailyActivityDto {
+    date: String,
+    count: i64,
+}
+
+#[derive(serde::Serialize, specta::Type)]
 struct HistoryEntryDto {
     timestamp: i64,
     duration_secs: f64,
@@ -66,7 +76,59 @@ struct HistoryEntryDto {
     engine: String,
 }
 
+/// Wire-format twin of `history::LatencyPercentiles`.
+#[derive(serde::Serialize, specta::Type)]
+struct LatencyPercentilesDto {
+    p50_ms: Option<f64>,
+    p95_ms: Option<f64>,
+    samples: i64,
+}
+
+/// Wire-format twin of `history::LatencyStats` — backs the Stats page's
+/// Latency table (frontend-rewrite plan, 2026-08-31).
+#[derive(serde::Serialize, specta::Type)]
+struct LatencyStatsDto {
+    recording: LatencyPercentilesDto,
+    inference: LatencyPercentilesDto,
+}
+
+impl From<history::LatencyPercentiles> for LatencyPercentilesDto {
+    fn from(p: history::LatencyPercentiles) -> Self {
+        Self {
+            p50_ms: p.p50_ms,
+            p95_ms: p.p95_ms,
+            samples: p.samples,
+        }
+    }
+}
+
+/// Same trailing-window length as the Activity chart (`get_daily_activity`'s
+/// existing `days` param, hardcoded to 14 on the frontend) — the Latency
+/// table and Activity chart are the same "last 14 days" window on the same
+/// Stats page, so there's no reason for them to silently disagree.
+const LATENCY_WINDOW_DAYS: u32 = 14;
+
 #[tauri::command]
+#[specta::specta]
+fn get_latency_stats(
+    state: tauri::State<Option<Arc<history::HistoryStore>>>,
+) -> Result<LatencyStatsDto, String> {
+    let store = state.inner().as_ref().ok_or("history store unavailable")?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let stats = store
+        .latency_stats(LATENCY_WINDOW_DAYS, now)
+        .map_err(|e| e.to_string())?;
+    Ok(LatencyStatsDto {
+        recording: stats.recording.into(),
+        inference: stats.inference.into(),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
 fn get_metrics(
     state: tauri::State<Option<Arc<history::HistoryStore>>>,
 ) -> Result<MetricsDto, String> {
@@ -79,10 +141,12 @@ fn get_metrics(
         words: m.total_word_count,
         time_saved_minutes: m.time_saved_minutes,
         average_wpm: m.average_wpm,
+        total_dictation_minutes: m.total_dictation_minutes,
     })
 }
 
 #[tauri::command]
+#[specta::specta]
 fn get_language_breakdown(
     state: tauri::State<Option<Arc<history::HistoryStore>>>,
 ) -> Result<Vec<LanguageStatDto>, String> {
@@ -90,11 +154,40 @@ fn get_language_breakdown(
     let rows = store.language_breakdown().map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(language, count)| LanguageStatDto { language, count })
+        .map(|s| LanguageStatDto {
+            language: s.language,
+            count: s.count,
+            average_wpm: s.average_wpm,
+        })
+        .collect())
+}
+
+/// Backs the Stats page's activity chart (2026-08-30 redesign) — see
+/// `HistoryStore::daily_activity`'s doc comment for why this is a real
+/// backend aggregate rather than the frontend bucketing raw history pages.
+#[tauri::command]
+#[specta::specta]
+fn get_daily_activity(
+    days: u32,
+    state: tauri::State<Option<Arc<history::HistoryStore>>>,
+) -> Result<Vec<DailyActivityDto>, String> {
+    let store = state.inner().as_ref().ok_or("history store unavailable")?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let rows = store.daily_activity(days, now).map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|d| DailyActivityDto {
+            date: d.date,
+            count: d.count,
+        })
         .collect())
 }
 
 #[tauri::command]
+#[specta::specta]
 fn get_history_page(
     page: u32,
     page_size: u32,
@@ -119,11 +212,12 @@ fn get_history_page(
 /// Backs the history list's "copy" button — Section 8: "doubles as the
 /// copy-and-paste-at-any-time recovery mechanism".
 #[tauri::command]
+#[specta::specta]
 fn copy_history_text(text: String) -> Result<(), String> {
     injection::copy_to_clipboard(&text).map_err(|e| e.to_string())
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 struct PermissionStatusDto {
     mic: &'static str,
     accessibility: &'static str,
@@ -143,6 +237,7 @@ fn permission_state_label(state: permissions::PermissionState) -> &'static str {
 /// status (permissions.rs), not the "not yet wired" placeholder it started
 /// as.
 #[tauri::command]
+#[specta::specta]
 fn get_permission_status() -> PermissionStatusDto {
     let mut mic = permissions::PermissionGate::<permissions::Mic>::new();
     mic.refresh();
@@ -164,6 +259,7 @@ fn get_permission_status() -> PermissionStatusDto {
 /// sidebar layout — not worth adding the separate `tauri-plugin-process`
 /// dependency for one button when `AppHandle::exit` already does this.
 #[tauri::command]
+#[specta::specta]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -177,6 +273,7 @@ fn quit_app(app: tauri::AppHandle) {
 struct RecoveryInfo(Option<String>);
 
 #[tauri::command]
+#[specta::specta]
 fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
     state.inner().0.clone()
 }
@@ -189,7 +286,44 @@ fn get_recovery_info(state: tauri::State<RecoveryInfo>) -> Option<String> {
 /// `set_grammar_llm_cleanup_enabled` below keeps both in sync.
 struct GrammarLlmCleanupFlag(Arc<AtomicBool>);
 
+/// The tray's "Start Listening"/"Stop Listening" item, retained as managed
+/// state so `session::update_tray_listening_indicator` can mutate its label
+/// and icon from wherever the session actor emits a pill-state change —
+/// see that function's own docs.
+pub(crate) struct ListeningMenuItem<R: tauri::Runtime>(pub tauri::menu::IconMenuItem<R>);
+
+/// Small filled danger-red dot — `IconMenuItem`'s icon while a recording is
+/// actually in progress, matching `--danger` (`#ff453a`) used everywhere
+/// else in the app for "this is the destructive/state-changing one" (the
+/// sidebar's Quit button, Recovery's Quit button). No icon at all
+/// (`set_icon(None)`) in every other state — presence of the icon, not just
+/// the text, is the signal.
+///
+/// Built as a raw RGBA buffer rather than a bundled PNG asset — `Image::
+/// from_bytes` needs tauri's `image-png` feature (a real `image`-crate PNG
+/// decoder dependency) for what's otherwise just a solid-color circle;
+/// computing the 16x16 buffer directly avoids that dependency entirely.
+pub(crate) fn tray_listening_danger_icon() -> tauri::image::Image<'static> {
+    const SIZE: u32 = 16;
+    const CENTER: f32 = (SIZE as f32 - 1.0) / 2.0;
+    const RADIUS: f32 = SIZE as f32 / 2.0 - 1.0;
+    let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let dx = x as f32 - CENTER;
+            let dy = y as f32 - CENTER;
+            if (dx * dx + dy * dy).sqrt() <= RADIUS {
+                rgba.extend_from_slice(&[0xff, 0x45, 0x3a, 0xff]); // --danger, opaque
+            } else {
+                rgba.extend_from_slice(&[0, 0, 0, 0]); // transparent
+            }
+        }
+    }
+    tauri::image::Image::new_owned(rgba, SIZE, SIZE)
+}
+
 #[tauri::command]
+#[specta::specta]
 fn get_settings(state: tauri::State<Mutex<settings::AppSettings>>) -> settings::AppSettings {
     state
         .inner()
@@ -204,6 +338,7 @@ fn get_settings(state: tauri::State<Mutex<settings::AppSettings>>) -> settings::
 /// wire rather than reusing `hotkey::HotkeyMode` directly, since that enum
 /// isn't (and doesn't need to be) `Deserialize`.
 #[tauri::command]
+#[specta::specta]
 fn set_hotkey(
     mode: String,
     shortcut: String,
@@ -263,6 +398,7 @@ fn set_hotkey(
 /// needed — the very next transcript picks it up) and persists to
 /// `settings.json` via the same `Mutex<AppSettings>` `set_hotkey` uses.
 #[tauri::command]
+#[specta::specta]
 fn set_grammar_llm_cleanup_enabled(
     enabled: bool,
     settings_state: tauri::State<Mutex<settings::AppSettings>>,
@@ -280,53 +416,160 @@ fn set_grammar_llm_cleanup_enabled(
         .map_err(|e| format!("setting updated but failed to persist to disk: {e}"))
 }
 
-/// Manual QA tool for the injection path (Section 11 / Phase 8's manual QA
-/// matrix, and Section 15's T12: "validate terminal text-injection... before
-/// Phase 3 begins"). T12 needs a human — it depends on real Accessibility
-/// permission and a focused text surface, neither of which an agent can
-/// grant or aim itself at. This lets a human insert arbitrary text at the
-/// cursor without running the full mic-capture-transcribe pipeline first, so
-/// the injection mechanism itself (AX vs. clipboard-fallback, multi-line and
-/// bracketed-paste behavior in a real terminal) can be exercised directly
-/// and repeatedly — independent of whether real speech or ASR is involved,
-/// which is exactly what T12 is actually worried about.
-///
-/// A runtime check rather than `#[cfg(debug_assertions)]` on the command
-/// itself/its `generate_handler!` entry — simpler than relying on that
-/// macro supporting cfg-gated argument lists, and the cost of leaving the
-/// dead branch compiled into a release build is negligible.
-#[tauri::command]
-async fn debug_test_injection(text: String) -> Result<String, String> {
-    if !cfg!(debug_assertions) {
-        return Err("debug_test_injection is disabled in release builds".into());
+/// Live, hot-path-readable twin of the seven new `AppSettings` boolean
+/// fields (frontend-rewrite plan, D3) — same reasoning as
+/// `GrammarLlmCleanupFlag`: `RuleBasedCleanup` and `segment_worker` read
+/// these on every transcript without locking the same `Mutex<AppSettings>`
+/// the Settings-panel commands use. `set_bool_setting` below is the single
+/// choke point that keeps both this and the persisted settings file in
+/// sync — one command instead of seven near-identical ones (D3), with
+/// tauri-specta still generating a fully-typed TS union for `field` so the
+/// frontend can never pass a typo'd/stringly-typed field name.
+struct LiveToggleFlags {
+    paste_automatically: Arc<AtomicBool>,
+    restore_clipboard: Arc<AtomicBool>,
+    rule_based: engine::grammar::RuleBasedCleanupFlags,
+}
+
+impl LiveToggleFlags {
+    fn from_settings(settings: &settings::AppSettings) -> Self {
+        Self {
+            paste_automatically: Arc::new(AtomicBool::new(settings.paste_automatically)),
+            restore_clipboard: Arc::new(AtomicBool::new(settings.restore_clipboard)),
+            rule_based: engine::grammar::RuleBasedCleanupFlags {
+                capitalise_sentences: Arc::new(AtomicBool::new(settings.capitalise_sentences)),
+                tidy_punctuation: Arc::new(AtomicBool::new(settings.tidy_punctuation)),
+                remove_filler_words: Arc::new(AtomicBool::new(settings.remove_filler_words)),
+                spoken_formatting: Arc::new(AtomicBool::new(settings.spoken_formatting)),
+                apply_spoken_corrections: Arc::new(AtomicBool::new(
+                    settings.apply_spoken_corrections,
+                )),
+            },
+        }
     }
-    tokio::task::spawn_blocking(move || injection::insert_at_cursor(&text))
-        .await
-        .map_err(|e| format!("injection task panicked: {e}"))?
-        .map(|method| format!("{method:?}"))
-        .map_err(|e| e.to_string())
+
+    /// The one atomic `field` selects — mirrors `AppSettings::field_mut`'s
+    /// match arms exactly (same enum, same seven variants).
+    fn atomic_for(&self, field: settings::SettingField) -> &Arc<AtomicBool> {
+        use settings::SettingField::*;
+        match field {
+            PasteAutomatically => &self.paste_automatically,
+            RestoreClipboard => &self.restore_clipboard,
+            CapitaliseSentences => &self.rule_based.capitalise_sentences,
+            TidyPunctuation => &self.rule_based.tidy_punctuation,
+            RemoveFillerWords => &self.rule_based.remove_filler_words,
+            SpokenFormatting => &self.rule_based.spoken_formatting,
+            ApplySpokenCorrections => &self.rule_based.apply_spoken_corrections,
+        }
+    }
+}
+
+/// Backs every new Settings toggle except grammar-LLM-cleanup (which keeps
+/// its own dedicated `set_grammar_llm_cleanup_enabled` command — pre-existing,
+/// left untouched). Same live-flag-plus-persisted-settings dual-update shape
+/// as that command, just generalized over `SettingField` (D3) instead of
+/// hardcoded to one field.
+#[tauri::command]
+#[specta::specta]
+fn set_bool_setting(
+    field: settings::SettingField,
+    enabled: bool,
+    settings_state: tauri::State<Mutex<settings::AppSettings>>,
+    live_flags: tauri::State<LiveToggleFlags>,
+) -> Result<(), String> {
+    live_flags
+        .inner()
+        .atomic_for(field)
+        .store(enabled, Ordering::Relaxed);
+
+    let mut settings = settings_state
+        .inner()
+        .lock()
+        .expect("settings lock poisoned");
+    *settings.field_mut(field) = enabled;
+    settings
+        .save()
+        .map_err(|e| format!("setting updated but failed to persist to disk: {e}"))
+}
+
+/// Wire-format twin of `vibrancy::Rect` — `serde::Deserialize` lives here
+/// rather than on the shared type since it's purely an IPC concern.
+#[derive(serde::Deserialize, specta::Type)]
+struct VibrancyRectDto {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+impl From<VibrancyRectDto> for vibrancy::Rect {
+    fn from(r: VibrancyRectDto) -> Self {
+        vibrancy::Rect {
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+        }
+    }
+}
+
+/// `pill.js` calls this on load and whenever `#pill`'s own rendered size
+/// changes (its width varies per state — listening shows a waveform/timer/
+/// controls, done/canceling show just an icon+status — even though the
+/// window itself is fixed-size and non-resizable, so a `ResizeObserver` on
+/// `#pill` itself is what drives this, not a window resize event).
+///
+/// Delegates to `session::apply_pill_layout`, which only touches the real
+/// window while it's visible or about to become visible — see that
+/// function's docs for the real bug this guards against (resizing/
+/// remasking a *hidden* vibrant window left a persistent WindowServer
+/// compositing ghost, and this command fires on every page load
+/// regardless of window visibility, so every launch used to trigger it).
+/// Only `pill.width` is used; `pill.x`/`pill.y` are not — see
+/// `apply_pill_layout`'s own docs for why.
+#[tauri::command]
+#[specta::specta]
+fn set_pill_vibrancy_layout(window: tauri::WebviewWindow, pill: VibrancyRectDto) {
+    session::apply_pill_layout(&window, pill.width);
+}
+
+/// Builds the tauri-specta command registry once, shared by both the real
+/// `invoke_handler` and (debug builds only) the TypeScript export below —
+/// this is the single source of truth for "what commands exist and what do
+/// their types look like" that `frontend/src/lib/bindings.ts` is generated
+/// from, so the frontend can never drift from what the backend actually
+/// accepts (the exact class of bug the frontend-rewrite plan's tauri-specta
+/// choice exists to eliminate — see this project's own history with the
+/// `Transcript` struct deviation).
+fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+        cancel_recording,
+        get_metrics,
+        get_language_breakdown,
+        get_daily_activity,
+        get_latency_stats,
+        get_history_page,
+        copy_history_text,
+        get_permission_status,
+        quit_app,
+        get_recovery_info,
+        get_settings,
+        set_hotkey,
+        set_grammar_llm_cleanup_enabled,
+        set_bool_setting,
+        set_pill_vibrancy_layout,
+    ])
 }
 
 pub fn run() {
     logging::init();
 
+    let specta_builder = specta_builder();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![
-            cancel_recording,
-            get_metrics,
-            get_language_breakdown,
-            get_history_page,
-            copy_history_text,
-            get_permission_status,
-            quit_app,
-            get_recovery_info,
-            debug_test_injection,
-            get_settings,
-            set_hotkey,
-            set_grammar_llm_cleanup_enabled
-        ])
+        .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
             // via Info.plist, per docs/mutter-project-plan.md Section 4
@@ -334,11 +577,29 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // The dashboard's vibrancy history, 2026-08-31, same day, three
+            // stops: static background image -> masked two-shape native
+            // vibrancy (`#app` card + `#sidebar` pill) -> no background at
+            // all -> here, uniform whole-window native vibrancy, same
+            // mechanism as pill/recovery, no masking. The masked attempt
+            // confirmed the native call itself worked (`applied=true`,
+            // correct geometry via a live diagnostic) but never actually
+            // constrained vibrancy to just the two reported shapes — the
+            // exact "rectangular edge artifacts" fragility vibrancy.rs's
+            // module docs already warned about, reproduced not resolved.
+            // Rather than keep fighting that, the dashboard now applies
+            // vibrancy to the whole window (`windowEffects` in
+            // tauri.conf.json, no masking command at all) and lets
+            // `#sidebar`/`#app` each carry their own `.glass-panel` tint on
+            // top — the gap around the floating sidebar is vibrant too, not
+            // real unblurred desktop, a deliberate reliability trade.
+
             let app_handle = app.handle().clone();
             let app_settings = settings::AppSettings::load();
             let grammar_llm_cleanup_enabled = Arc::new(AtomicBool::new(
                 app_settings.grammar_llm_cleanup_enabled,
             ));
+            let live_toggle_flags = LiveToggleFlags::from_settings(&app_settings);
 
             // The core loop (hotkey -> capture -> engine -> injection ->
             // history) only comes up if the history store opens cleanly.
@@ -360,9 +621,11 @@ pub fn run() {
                     let history = Arc::new(store);
                     let engine: Arc<dyn engine::TranscriptionEngine> =
                         Arc::new(engine::whisper::WhisperEngine::new());
-                    let grammar: Arc<dyn engine::TextProcessor> = Arc::new(
-                        engine::pipeline::GrammarPipeline::new(grammar_llm_cleanup_enabled.clone()),
-                    );
+                    let grammar: Arc<dyn engine::TextProcessor> =
+                        Arc::new(engine::pipeline::GrammarPipeline::new(
+                            grammar_llm_cleanup_enabled.clone(),
+                            live_toggle_flags.rule_based.clone(),
+                        ));
 
                     let handle = session::spawn(
                         app_handle.clone(),
@@ -370,6 +633,8 @@ pub fn run() {
                         grammar,
                         history.clone(),
                         DEFAULT_ENGINE_NAME,
+                        live_toggle_flags.paste_automatically.clone(),
+                        live_toggle_flags.restore_clipboard.clone(),
                     );
 
                     let hotkey_handle = handle.clone();
@@ -414,6 +679,7 @@ pub fn run() {
             app.manage(history_for_dashboard);
             app.manage(recovery_info);
             app.manage(GrammarLlmCleanupFlag(grammar_llm_cleanup_enabled));
+            app.manage(live_toggle_flags);
             app.manage(Mutex::new(app_settings));
 
             // The dashboard window is meant to persist for the app's whole
@@ -436,10 +702,41 @@ pub fn run() {
                 });
             }
 
+            // The pill is draggable (`data-tauri-drag-region` on `#pill`,
+            // 2026-08-30) — this is the only way to observe that a drag
+            // actually happened, since a native drag moves the window
+            // directly at the WindowServer level with no JS drag-start/
+            // drag-end event of our own. See session.rs's
+            // `handle_pill_moved` / `PILL_USER_POSITIONED` docs for why a
+            // real user drag needs to be told apart from our own
+            // programmatic repositioning here, not just observed directly.
+            if let Some(pill) = app.get_webview_window("pill") {
+                pill.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Moved(_) = event {
+                        session::handle_pill_moved();
+                    }
+                });
+            }
+
             // tauri.conf.json's `app.trayIcon` already creates the tray
             // icon itself at startup (id "main") — this attaches the menu
-            // and click handling to it.
+            // and click handling to it. `toggle_listening` is built as an
+            // `IconMenuItem` (not the `.text()` builder shorthand the other
+            // two items use) specifically so its handle can be retained and
+            // mutated later — see `ListeningMenuItem` and
+            // `session::update_tray_listening_indicator`, which flips its
+            // label between "Start Listening"/"Stop Listening" and shows a
+            // danger-red dot icon only while a recording is actually in
+            // progress (`state == "listening"`), the same signal the
+            // sidebar's own danger-colored Quit button uses for "this is
+            // the one destructive/state-changing action here".
+            let toggle_listening_item =
+                tauri::menu::IconMenuItemBuilder::with_id("toggle_listening", "Start Listening")
+                    .build(app)?;
+            app.manage(ListeningMenuItem(toggle_listening_item.clone()));
             let menu = MenuBuilder::new(app)
+                .item(&toggle_listening_item)
+                .separator()
                 .text("open_dashboard", "Open Dashboard")
                 .separator()
                 .quit()
@@ -447,7 +744,19 @@ pub fn run() {
             if let Some(tray) = app.tray_by_id("main") {
                 tray.set_menu(Some(menu))?;
                 tray.on_menu_event(move |app, event| {
-                    if event.id() == "open_dashboard" {
+                    if event.id() == "toggle_listening" {
+                        // Same toggle the mic hotkey itself sends — this
+                        // app's session model is toggle-based throughout
+                        // (press once to start, again to stop), not
+                        // push-to-talk, so there's no separate "start only"
+                        // primitive to call. Recovery mode has no session
+                        // handle at all (None), so this is a harmless no-op
+                        // there.
+                        if let Some(handle) = app.state::<Option<session::SessionHandle>>().inner()
+                        {
+                            handle.hotkey_pressed(hotkey::HotkeyMode::MicDictation);
+                        }
+                    } else if event.id() == "open_dashboard" {
                         // In recovery mode the dashboard window was closed
                         // above and has no working history store behind
                         // it anyway — route back to the recovery screen
@@ -465,4 +774,45 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running mutter");
+}
+
+#[cfg(test)]
+mod bindings_export {
+    /// Regenerates `frontend/src/lib/bindings.ts` from the current
+    /// `#[tauri::command]` definitions — the standard tauri-specta
+    /// pattern (a `#[test]`, not a runtime call in `run()`). Two real
+    /// reasons this lives here instead of app startup:
+    ///
+    /// 1. **A real bug, found live**: exporting from inside the actual
+    ///    launched `.app` bundle (even debug-only) makes macOS treat the
+    ///    write as "a GUI app touching your Documents folder" and throw up
+    ///    a TCC consent dialog — reproduced by launching the bundled app
+    ///    and watching a real "Mutter would like to access files in your
+    ///    Documents folder" prompt appear, blocking the window from
+    ///    rendering until dismissed. `cargo test` runs as a plain CLI
+    ///    process (inheriting the terminal's own TCC grants), which
+    ///    doesn't trigger this at all.
+    /// 2. Codegen-as-a-side-effect-of-starting-the-app is also just an
+    ///    unusual pattern regardless of the TCC issue — an explicit,
+    ///    deliberately-run step is more conventional.
+    ///
+    /// Run explicitly: `cargo test --lib export_bindings -- --ignored`.
+    /// `#[ignore]`d so it's not part of the default `cargo test` run (it
+    /// writes to the repo rather than asserting anything) — same
+    /// convention this crate already uses for the slow model-download
+    /// integration tests.
+    #[test]
+    #[ignore = "codegen, not an assertion — writes frontend/src/lib/bindings.ts; run explicitly after changing any #[tauri::command]"]
+    fn export_bindings() {
+        super::specta_builder()
+            .export(
+                specta_typescript::Typescript::default()
+                    .bigint(specta_typescript::BigIntExportBehavior::Number),
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../frontend/src/lib/bindings.ts"
+                ),
+            )
+            .expect("failed to export TypeScript bindings");
+    }
 }

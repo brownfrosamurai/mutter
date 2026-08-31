@@ -15,7 +15,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use super::grammar::RuleBasedCleanup;
+use super::grammar::{RuleBasedCleanup, RuleBasedCleanupFlags};
 use super::llm_cleanup::LlmCleanup;
 use super::{EngineError, TextProcessor};
 
@@ -26,9 +26,9 @@ pub struct GrammarPipeline {
 }
 
 impl GrammarPipeline {
-    pub fn new(llm_enabled: Arc<AtomicBool>) -> Self {
+    pub fn new(llm_enabled: Arc<AtomicBool>, rule_flags: RuleBasedCleanupFlags) -> Self {
         Self {
-            rules: RuleBasedCleanup,
+            rules: RuleBasedCleanup::new(rule_flags),
             llm: LlmCleanup::new(),
             llm_enabled,
         }
@@ -78,6 +78,10 @@ mod tests {
         }
     }
 
+    fn test_rules() -> RuleBasedCleanup {
+        RuleBasedCleanup::new(RuleBasedCleanupFlags::all_enabled())
+    }
+
     /// A stand-in `GrammarPipeline` whose Option B stage is swappable, so
     /// these tests exercise the real gating/fallback logic without needing
     /// the real ~470MB model download `LlmCleanup` requires.
@@ -104,7 +108,7 @@ mod tests {
     #[tokio::test]
     async fn skips_llm_stage_when_disabled() {
         let pipeline = TestPipeline {
-            rules: RuleBasedCleanup,
+            rules: test_rules(),
             llm: UppercaseProcessor,
             llm_enabled: Arc::new(AtomicBool::new(false)),
         };
@@ -115,7 +119,7 @@ mod tests {
     #[tokio::test]
     async fn runs_llm_stage_on_rules_output_when_enabled() {
         let pipeline = TestPipeline {
-            rules: RuleBasedCleanup,
+            rules: test_rules(),
             llm: UppercaseProcessor,
             llm_enabled: Arc::new(AtomicBool::new(true)),
         };
@@ -126,7 +130,7 @@ mod tests {
     #[tokio::test]
     async fn falls_back_to_rules_output_when_llm_stage_errors() {
         let pipeline = TestPipeline {
-            rules: RuleBasedCleanup,
+            rules: test_rules(),
             llm: FailingProcessor,
             llm_enabled: Arc::new(AtomicBool::new(true)),
         };
@@ -138,7 +142,7 @@ mod tests {
     async fn toggle_takes_effect_live_without_reconstructing_pipeline() {
         let llm_enabled = Arc::new(AtomicBool::new(false));
         let pipeline = TestPipeline {
-            rules: RuleBasedCleanup,
+            rules: test_rules(),
             llm: UppercaseProcessor,
             llm_enabled: llm_enabled.clone(),
         };
