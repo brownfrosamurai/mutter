@@ -11,6 +11,9 @@ Cargo.lock.bak
 node_modules/
 npm-debug.log*
 /frontend/dist/
+*.tsbuildinfo
+/frontend/vite.config.js
+/frontend/vite.config.d.ts
 
 # macOS
 .DS_Store
