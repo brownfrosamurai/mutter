@@ -67,7 +67,7 @@ export function StatsPanel() {
   const streak = activity.data ? computeStreak(activity.data) : 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {/* 4-tile grid matching the design-consultation preview's Sessions/
           Words/WPM/Saved layout exactly (2026-09-01, user-directed) — "Saved"
           uses metrics.time_saved_minutes, a real backend field that existed
@@ -76,15 +76,25 @@ export function StatsPanel() {
           live in "Time Spoken"'s subtext moved to the Activity section's
           meta line below instead of being dropped outright. */}
       <div className="grid grid-cols-4 gap-3">
-        <StatTile label="Sessions" value={metrics.data ? String(metrics.data.sessions) : "—"} />
-        <StatTile label="Words" value={metrics.data ? metrics.data.words.toLocaleString() : "—"} />
+        <StatTile
+          label="Sessions"
+          value={metrics.data ? String(metrics.data.sessions) : "—"}
+        />
+        <StatTile
+          label="Words"
+          value={metrics.data ? metrics.data.words.toLocaleString() : "—"}
+        />
         <StatTile
           label="WPM"
-          value={metrics.data ? String(Math.round(metrics.data.average_wpm)) : "—"}
+          value={
+            metrics.data ? String(Math.round(metrics.data.average_wpm)) : "—"
+          }
         />
         <StatTile
           label="Saved"
-          value={metrics.data ? formatMinutes(metrics.data.time_saved_minutes) : "—"}
+          value={
+            metrics.data ? formatMinutes(metrics.data.time_saved_minutes) : "—"
+          }
         />
       </div>
 
@@ -92,11 +102,15 @@ export function StatsPanel() {
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium text-text-primary">Activity</h2>
           <span className="text-xs text-text-secondary">
-            {activity.data?.length ?? 0} sessions · last {ACTIVITY_WINDOW_DAYS} days
+            {activity.data?.length ?? 0} sessions · last {ACTIVITY_WINDOW_DAYS}{" "}
+            days
             {streak > 0 ? ` · ${streak} day streak 🔥` : ""}
           </span>
         </div>
-        <ActivityChart days={ACTIVITY_WINDOW_DAYS} activity={activity.data ?? []} />
+        <ActivityChart
+          days={ACTIVITY_WINDOW_DAYS}
+          activity={activity.data ?? []}
+        />
       </section>
 
       <section>

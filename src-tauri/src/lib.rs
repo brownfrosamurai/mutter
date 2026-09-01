@@ -24,8 +24,14 @@ const DEFAULT_ENGINE_NAME: &str = "whisper-small";
 
 /// Same value as `--radius-panel` in `globals.css` — the dashboard window's
 /// outer "shell" gets real native corner rounding to match, via
-/// `vibrancy::apply_dashboard_glass`.
+/// `vibrancy::apply_glass_shell`.
 const DASHBOARD_SHELL_RADIUS: f64 = 16.0;
+
+/// `session::PILL_HEIGHT / 2.0` — a capsule's corner radius is half its
+/// (constant) height. Same mechanism as `DASHBOARD_SHELL_RADIUS`, applied to
+/// the pill window in `setup()` below — see `vibrancy.rs`'s module doc for
+/// why the pill, unlike the dashboard, needs no dead-space trade-off here.
+const PILL_SHELL_RADIUS: f64 = session::PILL_HEIGHT / 2.0;
 
 /// Manual equivalent of pressing the global Escape hotkey — the pill's
 /// cancel button (`#pill-cancel`) invokes this, since a webview button click
@@ -632,45 +638,24 @@ fn set_bool_setting(
         .map_err(|e| format!("setting updated but failed to persist to disk: {e}"))
 }
 
-/// Wire-format twin of `vibrancy::Rect` — `serde::Deserialize` lives here
-/// rather than on the shared type since it's purely an IPC concern.
-#[derive(serde::Deserialize, specta::Type)]
-struct VibrancyRectDto {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-}
-
-impl From<VibrancyRectDto> for vibrancy::Rect {
-    fn from(r: VibrancyRectDto) -> Self {
-        vibrancy::Rect {
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-        }
-    }
-}
-
-/// `pill.js` calls this on load and whenever `#pill`'s own rendered size
-/// changes (its width varies per state — listening shows a waveform/timer/
+/// `Pill.tsx` calls this on load and whenever `#pill`'s own rendered width
+/// changes (it varies per state — listening shows a waveform/timer/
 /// controls, done/canceling show just an icon+status — even though the
-/// window itself is fixed-size and non-resizable, so a `ResizeObserver` on
+/// window itself is non-resizable-by-the-user, so a `ResizeObserver` on
 /// `#pill` itself is what drives this, not a window resize event).
 ///
-/// Delegates to `session::apply_pill_layout`, which only touches the real
-/// window while it's visible or about to become visible — see that
-/// function's docs for the real bug this guards against (resizing/
-/// remasking a *hidden* vibrant window left a persistent WindowServer
-/// compositing ghost, and this command fires on every page load
-/// regardless of window visibility, so every launch used to trigger it).
-/// Only `pill.width` is used; `pill.x`/`pill.y` are not — see
-/// `apply_pill_layout`'s own docs for why.
+/// Delegates to `session::apply_pill_layout`, which resizes+repositions the
+/// real window to fit, only while it's visible or about to become visible —
+/// see that function's docs for the real bug this guards against (acting on
+/// a *hidden* window left a persistent WindowServer compositing ghost, and
+/// this command fires on every page load regardless of window visibility,
+/// so every launch used to trigger it). No vibrancy masking happens here
+/// any more — the pill's native glass shell is applied once, at startup,
+/// via `vibrancy::apply_glass_shell` — see `vibrancy.rs`'s module doc.
 #[tauri::command]
 #[specta::specta]
-fn set_pill_vibrancy_layout(window: tauri::WebviewWindow, pill: VibrancyRectDto) {
-    session::apply_pill_layout(&window, pill.width);
+fn set_pill_content_width(window: tauri::WebviewWindow, width: f64) {
+    session::apply_pill_layout(&window, width);
 }
 
 /// Shows the dashboard window — both real call sites (`complete_onboarding`,
@@ -678,7 +663,7 @@ fn set_pill_vibrancy_layout(window: tauri::WebviewWindow, pill: VibrancyRectDto)
 /// `.show()`.
 ///
 /// **The shell's square corners are fixed for real now** — see
-/// `vibrancy::apply_dashboard_glass` (applied once at startup, in `setup()`
+/// `vibrancy::apply_glass_shell` (applied once at startup, in `setup()`
 /// below, not here — it doesn't need reapplying on every show the way the
 /// old per-resize masking attempt did). A first attempt at this (2026-09-01,
 /// single-shape `maskImage` masking, matching the pill's approach) was
@@ -724,7 +709,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         set_hotkey,
         set_grammar_llm_cleanup_enabled,
         set_bool_setting,
-        set_pill_vibrancy_layout,
+        set_pill_content_width,
     ])
 }
 
@@ -878,13 +863,21 @@ pub fn run() {
 
             // Real rounded-corner "shell" material (macOS 26+ Liquid Glass,
             // flat vibrancy fallback below that) — see vibrancy.rs's
-            // `apply_dashboard_glass` for the full story. Once, here: unlike
+            // `apply_glass_shell` for the full story. Once, here: unlike
             // the reverted per-resize masking attempt, this doesn't need
             // re-applying on layout changes, and doesn't depend on the
             // window's visibility (it's still correct whenever the window is
-            // later shown, hidden or not right now).
+            // later shown, hidden or not right now). The pill gets the same
+            // treatment (2026-09-01, replacing its own separate maskImage
+            // shim — see vibrancy.rs) at a constant radius, since its window
+            // always resizes to exactly fit its capsule content at a fixed
+            // height (`session::PILL_HEIGHT`) — no dead-space trade-off
+            // needed the way the dashboard's floating-sidebar gap has.
             if let Some(win) = app.get_webview_window("dashboard") {
-                vibrancy::apply_dashboard_glass(&win, DASHBOARD_SHELL_RADIUS);
+                vibrancy::apply_glass_shell(&win, DASHBOARD_SHELL_RADIUS);
+            }
+            if let Some(win) = app.get_webview_window("pill") {
+                vibrancy::apply_glass_shell(&win, PILL_SHELL_RADIUS);
             }
 
             // The dashboard window is meant to persist for the app's whole

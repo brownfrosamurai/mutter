@@ -24,13 +24,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
-        "shadow": false,
-        "windowEffects": {
-          "effects": [
-            "hudWindow"
-          ],
-          "state": "active"
-        }
+        "shadow": false
       },
       {
         "label": "dashboard",

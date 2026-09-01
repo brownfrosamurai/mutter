@@ -89,11 +89,10 @@ export function Pill() {
     };
   }, []);
 
-  // Reports #pill's real rendered width to Rust so the native vibrancy
-  // layer resizes/masks itself to exactly that shape — see
-  // session::apply_pill_layout's docs (src-tauri) for why this is the
-  // one piece of native-vibrancy machinery a React rewrite still has to
-  // replicate. Debounced via a single requestAnimationFrame guard,
+  // Reports #pill's real rendered width to Rust so the native window
+  // resizes to exactly fit it — see session::apply_pill_layout's docs
+  // (src-tauri) for why the window itself (not just CSS) has to track
+  // content width. Debounced via a single requestAnimationFrame guard,
   // mirroring the original vanilla JS exactly — this is what the
   // pre-rewrite pill needed to fix a real double-fire compositing-seam
   // bug (ResizeObserver's spec-guaranteed initial callback firing
@@ -107,13 +106,7 @@ export function Pill() {
       if (rafRef.current !== null) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
-        const rect = el.getBoundingClientRect();
-        void commands.setPillVibrancyLayout({
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        });
+        void commands.setPillContentWidth(el.getBoundingClientRect().width);
       });
     };
 

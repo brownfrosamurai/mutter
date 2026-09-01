@@ -199,23 +199,23 @@ async setBoolSetting(field: SettingField, enabled: boolean) : Promise<Result<nul
 }
 },
 /**
- * `pill.js` calls this on load and whenever `#pill`'s own rendered size
- * changes (its width varies per state — listening shows a waveform/timer/
+ * `Pill.tsx` calls this on load and whenever `#pill`'s own rendered width
+ * changes (it varies per state — listening shows a waveform/timer/
  * controls, done/canceling show just an icon+status — even though the
- * window itself is fixed-size and non-resizable, so a `ResizeObserver` on
+ * window itself is non-resizable-by-the-user, so a `ResizeObserver` on
  * `#pill` itself is what drives this, not a window resize event).
  * 
- * Delegates to `session::apply_pill_layout`, which only touches the real
- * window while it's visible or about to become visible — see that
- * function's docs for the real bug this guards against (resizing/
- * remasking a *hidden* vibrant window left a persistent WindowServer
- * compositing ghost, and this command fires on every page load
- * regardless of window visibility, so every launch used to trigger it).
- * Only `pill.width` is used; `pill.x`/`pill.y` are not — see
- * `apply_pill_layout`'s own docs for why.
+ * Delegates to `session::apply_pill_layout`, which resizes+repositions the
+ * real window to fit, only while it's visible or about to become visible —
+ * see that function's docs for the real bug this guards against (acting on
+ * a *hidden* window left a persistent WindowServer compositing ghost, and
+ * this command fires on every page load regardless of window visibility,
+ * so every launch used to trigger it). No vibrancy masking happens here
+ * any more — the pill's native glass shell is applied once, at startup,
+ * via `vibrancy::apply_glass_shell` — see `vibrancy.rs`'s module doc.
  */
-async setPillVibrancyLayout(pill: VibrancyRectDto) : Promise<void> {
-    await TAURI_INVOKE("set_pill_vibrancy_layout", { pill });
+async setPillContentWidth(width: number) : Promise<void> {
+    await TAURI_INVOKE("set_pill_content_width", { width });
 }
 }
 
@@ -325,11 +325,6 @@ export type PermissionStatusDto = { mic: string; accessibility: string; system_a
  * `/plan-eng-review` — see the frontend-rewrite plan's D3).
  */
 export type SettingField = "pasteAutomatically" | "restoreClipboard" | "capitaliseSentences" | "tidyPunctuation" | "removeFillerWords" | "spokenFormatting" | "applySpokenCorrections"
-/**
- * Wire-format twin of `vibrancy::Rect` — `serde::Deserialize` lives here
- * rather than on the shared type since it's purely an IPC concern.
- */
-export type VibrancyRectDto = { x: number; y: number; width: number; height: number }
 
 /** tauri-specta globals **/
 

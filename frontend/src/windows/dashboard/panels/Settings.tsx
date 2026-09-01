@@ -5,7 +5,10 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { commands, type SettingField } from "@/lib/bindings";
 import { SettingRow } from "@/components/SettingRow";
 import { HotkeyCapture } from "@/components/HotkeyCapture";
-import { PermissionRow, type PermissionRowKind } from "@/components/PermissionRow";
+import {
+  PermissionRow,
+  type PermissionRowKind,
+} from "@/components/PermissionRow";
 import { usePermissionsQuery } from "@/lib/hooks";
 
 /** Title/description matches the reference screenshots, with one deliberate
@@ -24,7 +27,11 @@ import { usePermissionsQuery } from "@/lib/hooks";
  * only the UI controls for them are gone. Easy one-line-per-row revert if
  * that turns out to be the wrong call; see git history for the removed
  * entries. */
-const OUTPUT_TOGGLES: { field: SettingField; title: string; description: string }[] = [
+const OUTPUT_TOGGLES: {
+  field: SettingField;
+  title: string;
+  description: string;
+}[] = [
   {
     field: "capitaliseSentences",
     title: "Capitalise sentences",
@@ -33,7 +40,8 @@ const OUTPUT_TOGGLES: { field: SettingField; title: string; description: string 
   {
     field: "removeFillerWords",
     title: "Remove filler words",
-    description: 'Drop "um", "uh", "you know" and similar so speech reads like writing.',
+    description:
+      'Drop "um", "uh", "you know" and similar so speech reads like writing.',
   },
 ];
 
@@ -63,7 +71,10 @@ function UpdateRow() {
       const update = await check();
       setState(update ? { kind: "available", update } : { kind: "up-to-date" });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -85,7 +96,10 @@ function UpdateRow() {
       });
       setState({ kind: "ready" });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -100,7 +114,9 @@ function UpdateRow() {
       case "available":
         return `Version ${state.update.version} is available.`;
       case "downloading":
-        return state.percent === null ? "Downloading…" : `Downloading… ${state.percent}%`;
+        return state.percent === null
+          ? "Downloading…"
+          : `Downloading… ${state.percent}%`;
       case "ready":
         return "Downloaded — restart to finish updating.";
       case "error":
@@ -111,7 +127,9 @@ function UpdateRow() {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-glass-border py-3 last:border-b-0">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-text-primary">Software update</div>
+        <div className="text-sm font-medium text-text-primary">
+          Software update
+        </div>
         <div className="mt-0.5 text-xs text-text-secondary">{statusText}</div>
       </div>
       {state.kind === "available" ? (
@@ -182,18 +200,24 @@ export function SettingsPanel() {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Permissions</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Permissions
+        </h2>
         <div>
-          {(["mic", "accessibility", "system_audio"] as const satisfies readonly PermissionRowKind[]).map(
-            (key) => (
-              <PermissionRow
-                key={key}
-                kind={key}
-                status={permissions.data?.[key]}
-                onGrantAttempted={() => void permissions.refetch()}
-              />
-            ),
-          )}
+          {(
+            [
+              "mic",
+              "accessibility",
+              "system_audio",
+            ] as const satisfies readonly PermissionRowKind[]
+          ).map((key) => (
+            <PermissionRow
+              key={key}
+              kind={key}
+              status={permissions.data?.[key]}
+              onGrantAttempted={() => void permissions.refetch()}
+            />
+          ))}
         </div>
       </section>
 
@@ -205,12 +229,14 @@ export function SettingsPanel() {
           documented in HotkeyCapture's own module doc; the preview's
           simpler text-input mock isn't a good enough reason to regress it. */}
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Hotkey</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Hotkey
+        </h2>
         {settings.data && (
           <div className="mt-3 grid grid-cols-2 gap-3">
             <HotkeyCapture
               title="Mic Dictation"
-              description="Records from default mic"
+              description=""
               shortcut={settings.data.mic_hotkey}
               onCapture={async (shortcut) => {
                 const res = await commands.setHotkey("mic", shortcut);
@@ -220,7 +246,7 @@ export function SettingsPanel() {
             />
             <HotkeyCapture
               title="System Audio"
-              description="Captures internal audio"
+              description=""
               shortcut={settings.data.system_audio_hotkey}
               onCapture={async (shortcut) => {
                 const res = await commands.setHotkey("system_audio", shortcut);
@@ -233,14 +259,24 @@ export function SettingsPanel() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Cleanup</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Cleanup
+        </h2>
         <div>
           {OUTPUT_TOGGLES.map(({ field, title, description }) => (
             <SettingRow
               key={field}
               title={title}
               description={description}
-              checked={settings.data ? Boolean(settings.data[fieldToSnakeCase(field) as keyof typeof settings.data]) : true}
+              checked={
+                settings.data
+                  ? Boolean(
+                      settings.data[
+                        fieldToSnakeCase(field) as keyof typeof settings.data
+                      ],
+                    )
+                  : true
+              }
               onCheckedChange={(checked) => void handleToggle(field, checked)}
               disabled={!settings.data}
             />
@@ -256,7 +292,9 @@ export function SettingsPanel() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Updates</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Updates
+        </h2>
         <div>
           <UpdateRow />
         </div>
