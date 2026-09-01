@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { commands } from "@/lib/bindings";
 import { StatTile } from "@/components/StatTile";
 import { ActivityChart } from "@/components/ActivityChart";
-import { LanguageBar } from "@/components/LanguageBar";
+import { LatencyTable } from "@/components/LatencyTable";
 
-const ACTIVITY_WINDOW_DAYS = 14;
+const ACTIVITY_WINDOW_DAYS = 7;
 
 function formatMinutes(min: number): string {
   const totalSeconds = Math.round(min * 60);
@@ -48,14 +48,6 @@ export function StatsPanel() {
       return res.data;
     },
   });
-  const languages = useQuery({
-    queryKey: ["language-breakdown"],
-    queryFn: async () => {
-      const res = await commands.getLanguageBreakdown();
-      if (res.status === "error") throw new Error(res.error);
-      return res.data;
-    },
-  });
   const activity = useQuery({
     queryKey: ["daily-activity", ACTIVITY_WINDOW_DAYS],
     queryFn: async () => {
@@ -64,15 +56,15 @@ export function StatsPanel() {
       return res.data;
     },
   });
+  const latency = useQuery({
+    queryKey: ["latency-stats"],
+    queryFn: async () => {
+      const res = await commands.getLatencyStats();
+      if (res.status === "error") throw new Error(res.error);
+      return res.data;
+    },
+  });
   const streak = activity.data ? computeStreak(activity.data) : 0;
-  // English only (2026-08-31, user-directed) — this app's v1 scope is
-  // English-only per CLAUDE.md/mutter-project-plan.md Section 6/17; Whisper
-  // still auto-detects and transcribes other languages if dictated, but the
-  // Languages breakdown only ever needs to report on the one it's scoped to.
-  const englishOnly = languages.data?.filter((l) => l.language === "en") ?? [];
-  const maxLanguageCount = englishOnly.length
-    ? Math.max(...englishOnly.map((l) => l.count))
-    : 1;
 
   return (
     <div className="flex flex-col gap-5">
@@ -108,22 +100,8 @@ export function StatsPanel() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium text-text-primary">Languages</h2>
-        <div className="flex flex-col gap-2">
-          {englishOnly.length ? (
-            englishOnly.map((l) => (
-              <LanguageBar
-                key={l.language}
-                language={l.language}
-                count={l.count}
-                averageWpm={l.average_wpm}
-                fraction={l.count / maxLanguageCount}
-              />
-            ))
-          ) : (
-            <p className="text-sm text-text-secondary">No dictations yet.</p>
-          )}
-        </div>
+        <h2 className="mb-2 text-sm font-medium text-text-primary">Latency</h2>
+        {latency.data && <LatencyTable stats={latency.data} />}
       </section>
     </div>
   );
