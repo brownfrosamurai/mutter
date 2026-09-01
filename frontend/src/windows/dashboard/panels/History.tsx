@@ -99,7 +99,7 @@ export function HistoryPanel() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search recent transcripts…"
+          placeholder="Search transcripts…"
           className="w-full rounded-small bg-surface-inset py-2 pl-8 pr-3 text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         />
       </div>

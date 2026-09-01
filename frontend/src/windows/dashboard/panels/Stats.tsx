@@ -3,7 +3,6 @@ import { commands } from "@/lib/bindings";
 import { StatTile } from "@/components/StatTile";
 import { ActivityChart } from "@/components/ActivityChart";
 import { LanguageBar } from "@/components/LanguageBar";
-import { LatencyTable } from "@/components/LatencyTable";
 
 const ACTIVITY_WINDOW_DAYS = 14;
 
@@ -18,7 +17,9 @@ function formatMinutes(min: number): string {
 /** Consecutive days (including today) with at least one session — computed
  * client-side from the same daily_activity data the chart already fetches,
  * not a fabricated number or a new backend aggregate for what's cheap to
- * derive from data already on hand. */
+ * derive from data already on hand. Surfaced in the Activity section's own
+ * meta line (not a stat tile — the design-consultation preview's 4-tile
+ * grid has no room for it, see Stats panel's 2026-09-01 restructure). */
 function computeStreak(activity: { date: string; count: number }[]): number {
   const byDate = new Map(activity.map((a) => [a.date, a.count]));
   let streak = 0;
@@ -63,15 +64,6 @@ export function StatsPanel() {
       return res.data;
     },
   });
-  const latency = useQuery({
-    queryKey: ["latency-stats"],
-    queryFn: async () => {
-      const res = await commands.getLatencyStats();
-      if (res.status === "error") throw new Error(res.error);
-      return res.data;
-    },
-  });
-
   const streak = activity.data ? computeStreak(activity.data) : 0;
   // English only (2026-08-31, user-directed) — this app's v1 scope is
   // English-only per CLAUDE.md/mutter-project-plan.md Section 6/17; Whisper
@@ -84,21 +76,23 @@ export function StatsPanel() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-3 gap-4">
+      {/* 4-tile grid matching the design-consultation preview's Sessions/
+          Words/WPM/Saved layout exactly (2026-09-01, user-directed) — "Saved"
+          uses metrics.time_saved_minutes, a real backend field that existed
+          but was never wired into any panel before this. No subtext under
+          tiles, matching the preview's clean look; the streak that used to
+          live in "Time Spoken"'s subtext moved to the Activity section's
+          meta line below instead of being dropped outright. */}
+      <div className="grid grid-cols-4 gap-3">
+        <StatTile label="Sessions" value={metrics.data ? String(metrics.data.sessions) : "—"} />
+        <StatTile label="Words" value={metrics.data ? metrics.data.words.toLocaleString() : "—"} />
         <StatTile
-          label="Transcriptions"
-          value={metrics.data ? String(metrics.data.sessions) : "—"}
-          sub={metrics.data ? `${metrics.data.sessions} sessions total` : ""}
+          label="WPM"
+          value={metrics.data ? String(Math.round(metrics.data.average_wpm)) : "—"}
         />
         <StatTile
-          label="Words"
-          value={metrics.data ? metrics.data.words.toLocaleString() : "—"}
-          sub={metrics.data ? `${Math.round(metrics.data.average_wpm)} avg wpm` : ""}
-        />
-        <StatTile
-          label="Time Spoken"
-          value={metrics.data ? formatMinutes(metrics.data.total_dictation_minutes) : "—"}
-          sub={streak > 0 ? `${streak} day streak 🔥` : ""}
+          label="Saved"
+          value={metrics.data ? formatMinutes(metrics.data.time_saved_minutes) : "—"}
         />
       </div>
 
@@ -107,6 +101,7 @@ export function StatsPanel() {
           <h2 className="text-sm font-medium text-text-primary">Activity</h2>
           <span className="text-xs text-text-secondary">
             {activity.data?.length ?? 0} sessions · last {ACTIVITY_WINDOW_DAYS} days
+            {streak > 0 ? ` · ${streak} day streak 🔥` : ""}
           </span>
         </div>
         <ActivityChart days={ACTIVITY_WINDOW_DAYS} activity={activity.data ?? []} />
@@ -129,11 +124,6 @@ export function StatsPanel() {
             <p className="text-sm text-text-secondary">No dictations yet.</p>
           )}
         </div>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-medium text-text-primary">Latency</h2>
-        {latency.data && <LatencyTable stats={latency.data} />}
       </section>
     </div>
   );

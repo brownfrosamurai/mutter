@@ -10,7 +10,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: { id: PanelId; label: string; icon: typeof BarChart3 }[] = [
-  { id: "stats", label: "Stats", icon: BarChart3 },
+  { id: "stats", label: "Metrics", icon: BarChart3 },
   { id: "history", label: "History", icon: History },
   { id: "settings", label: "Settings", icon: Settings },
 ];
