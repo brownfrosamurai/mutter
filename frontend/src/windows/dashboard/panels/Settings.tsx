@@ -1,57 +1,47 @@
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { commands, type SettingField } from "@/lib/bindings";
 import { SettingRow } from "@/components/SettingRow";
 import { HotkeyCapture } from "@/components/HotkeyCapture";
-import { PermissionRow, type PermissionRowKind } from "@/components/PermissionRow";
+import {
+  PermissionRow,
+  type PermissionRowKind,
+} from "@/components/PermissionRow";
 import { usePermissionsQuery } from "@/lib/hooks";
 
-/** Every new toggle (D3's SettingField union) — title/description matches
- * the reference screenshots, with one deliberate wording adjustment
- * (Capitalise sentences) confirmed with the user in `/plan-eng-review`:
- * the toggle keeps today's real first-letter-only behavior, so the
- * description says exactly that instead of overclaiming per-sentence
- * capitalisation. */
-const OUTPUT_TOGGLES: { field: SettingField; title: string; description: string }[] = [
-  {
-    field: "pasteAutomatically",
-    title: "Paste automatically",
-    description: "Paste into whatever had focus. Turn this off to only copy to the clipboard.",
-  },
-  {
-    field: "restoreClipboard",
-    title: "Restore my clipboard",
-    description:
-      "Put back what was on the clipboard after pasting. Turn this off if pastes arrive empty in a particular app.",
-  },
+/** Title/description matches the reference screenshots, with one deliberate
+ * wording adjustment (Capitalise sentences) confirmed with the user in
+ * `/plan-eng-review`: the toggle keeps today's real first-letter-only
+ * behavior, so the description says exactly that instead of overclaiming
+ * per-sentence capitalisation.
+ *
+ * Trimmed to exactly the two toggles the design-consultation preview's
+ * "Cleanup" section shows (2026-09-01, user-directed: "match the preview
+ * exactly... remove things if necessary") — pasteAutomatically,
+ * restoreClipboard, tidyPunctuation, spokenFormatting, and
+ * applySpokenCorrections are no longer exposed here. Their backend fields
+ * and behavior are untouched (still real `AppSettings` fields, still wired
+ * into the grammar pipeline, still readable/editable via settings.json) —
+ * only the UI controls for them are gone. Easy one-line-per-row revert if
+ * that turns out to be the wrong call; see git history for the removed
+ * entries. */
+const OUTPUT_TOGGLES: {
+  field: SettingField;
+  title: string;
+  description: string;
+}[] = [
   {
     field: "capitaliseSentences",
     title: "Capitalise sentences",
     description: "Capitalise the first letter of each transcript.",
   },
   {
-    field: "tidyPunctuation",
-    title: "Tidy punctuation",
-    description: "Normalise spacing, quotes and terminal punctuation.",
-  },
-  {
     field: "removeFillerWords",
     title: "Remove filler words",
-    description: 'Drop "um", "uh", "you know" and similar so speech reads like writing.',
-  },
-  {
-    field: "spokenFormatting",
-    title: "Spoken formatting",
-    description: 'Turn "new line", "new paragraph", "comma" and "period" into the thing you said.',
-  },
-  {
-    field: "applySpokenCorrections",
-    title: "Apply spoken corrections",
     description:
-      'When you correct yourself out loud — "Tuesday, sorry, I meant Wednesday" — keep only the correction. It matches spoken phrases like "I meant" and "make that"; it does not rewrite your wording.',
+      'Drop "um", "uh", "you know" and similar so speech reads like writing.',
   },
 ];
 
@@ -81,7 +71,10 @@ function UpdateRow() {
       const update = await check();
       setState(update ? { kind: "available", update } : { kind: "up-to-date" });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -103,7 +96,10 @@ function UpdateRow() {
       });
       setState({ kind: "ready" });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -118,7 +114,9 @@ function UpdateRow() {
       case "available":
         return `Version ${state.update.version} is available.`;
       case "downloading":
-        return state.percent === null ? "Downloading…" : `Downloading… ${state.percent}%`;
+        return state.percent === null
+          ? "Downloading…"
+          : `Downloading… ${state.percent}%`;
       case "ready":
         return "Downloaded — restart to finish updating.";
       case "error":
@@ -129,7 +127,9 @@ function UpdateRow() {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-glass-border py-3 last:border-b-0">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-text-primary">Software update</div>
+        <div className="text-sm font-medium text-text-primary">
+          Software update
+        </div>
         <div className="mt-0.5 text-xs text-text-secondary">{statusText}</div>
       </div>
       {state.kind === "available" ? (
@@ -164,7 +164,6 @@ function UpdateRow() {
 
 export function SettingsPanel() {
   const queryClient = useQueryClient();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const settings = useQuery({
     queryKey: ["settings"],
@@ -201,14 +200,83 @@ export function SettingsPanel() {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Output</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Permissions
+        </h2>
+        <div>
+          {(
+            [
+              "mic",
+              "accessibility",
+              "system_audio",
+            ] as const satisfies readonly PermissionRowKind[]
+          ).map((key) => (
+            <PermissionRow
+              key={key}
+              kind={key}
+              status={permissions.data?.[key]}
+              onGrantAttempted={() => void permissions.refetch()}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Promoted out of a collapsed "Advanced" disclosure — the preview
+          shows hotkey configuration as a first-class, always-visible
+          section, not a hidden power-user detail. Still click-to-capture
+          (HotkeyCapture), not a typed-string + Save field — that flow was
+          deliberately replaced pre-redesign for a real, tested UX reason
+          documented in HotkeyCapture's own module doc; the preview's
+          simpler text-input mock isn't a good enough reason to regress it. */}
+      <section>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Hotkey
+        </h2>
+        {settings.data && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <HotkeyCapture
+              title="Mic Dictation"
+              description=""
+              shortcut={settings.data.mic_hotkey}
+              onCapture={async (shortcut) => {
+                const res = await commands.setHotkey("mic", shortcut);
+                if (res.status === "error") throw new Error(res.error);
+                await queryClient.invalidateQueries({ queryKey: ["settings"] });
+              }}
+            />
+            <HotkeyCapture
+              title="System Audio"
+              description=""
+              shortcut={settings.data.system_audio_hotkey}
+              onCapture={async (shortcut) => {
+                const res = await commands.setHotkey("system_audio", shortcut);
+                if (res.status === "error") throw new Error(res.error);
+                await queryClient.invalidateQueries({ queryKey: ["settings"] });
+              }}
+            />
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Cleanup
+        </h2>
         <div>
           {OUTPUT_TOGGLES.map(({ field, title, description }) => (
             <SettingRow
               key={field}
               title={title}
               description={description}
-              checked={settings.data ? Boolean(settings.data[fieldToSnakeCase(field) as keyof typeof settings.data]) : true}
+              checked={
+                settings.data
+                  ? Boolean(
+                      settings.data[
+                        fieldToSnakeCase(field) as keyof typeof settings.data
+                      ],
+                    )
+                  : true
+              }
               onCheckedChange={(checked) => void handleToggle(field, checked)}
               disabled={!settings.data}
             />
@@ -224,67 +292,12 @@ export function SettingsPanel() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Permissions</h2>
-        <div>
-          {(["mic", "accessibility", "system_audio"] as const satisfies readonly PermissionRowKind[]).map(
-            (key) => (
-              <PermissionRow
-                key={key}
-                kind={key}
-                status={permissions.data?.[key]}
-                onGrantAttempted={() => void permissions.refetch()}
-              />
-            ),
-          )}
-          <div className="flex items-center justify-between border-b border-glass-border py-2 last:border-b-0">
-            <span className="setting-label text-sm text-text-primary">Engine</span>
-            <span className="text-xs text-text-secondary" title="Apple Speech was not built — Whisper already won the Phase 0 benchmark for English.">
-              Whisper (small) — English
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Updates</h2>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
+          Updates
+        </h2>
         <div>
           <UpdateRow />
         </div>
-      </section>
-
-      <section>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((o) => !o)}
-          className="flex items-center gap-1 text-xs uppercase tracking-wide text-text-secondary"
-        >
-          {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Advanced
-        </button>
-        {advancedOpen && settings.data && (
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <HotkeyCapture
-              title="Mic Dictation"
-              description="Records from default mic"
-              shortcut={settings.data.mic_hotkey}
-              onCapture={async (shortcut) => {
-                const res = await commands.setHotkey("mic", shortcut);
-                if (res.status === "error") throw new Error(res.error);
-                await queryClient.invalidateQueries({ queryKey: ["settings"] });
-              }}
-            />
-            <HotkeyCapture
-              title="System Audio"
-              description="Captures internal audio"
-              shortcut={settings.data.system_audio_hotkey}
-              onCapture={async (shortcut) => {
-                const res = await commands.setHotkey("system_audio", shortcut);
-                if (res.status === "error") throw new Error(res.error);
-                await queryClient.invalidateQueries({ queryKey: ["settings"] });
-              }}
-            />
-          </div>
-        )}
       </section>
     </div>
   );

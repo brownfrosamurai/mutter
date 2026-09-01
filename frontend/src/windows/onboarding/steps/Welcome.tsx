@@ -7,10 +7,10 @@ export function Welcome() {
     <div className="flex flex-col items-center text-center">
       <div
         aria-hidden="true"
-        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full text-text-primary"
+        className="mb-4 flex h-11 w-11 items-center justify-center rounded-full text-text-primary"
         style={{ backgroundColor: "var(--surface-active)" }}
       >
-        <AudioWaveform size={22} strokeWidth={2} />
+        <AudioWaveform size={20} strokeWidth={2} />
       </div>
       <h1 className="text-lg font-semibold text-text-primary">Welcome to Mutter</h1>
       <p className="mt-2 text-sm text-text-secondary">

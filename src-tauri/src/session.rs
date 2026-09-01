@@ -107,7 +107,6 @@ use crate::engine::{TextProcessor, TranscriptionEngine};
 use crate::history::{HistoryEntry, HistoryStore};
 use crate::hotkey::HotkeyMode;
 use crate::injection;
-use crate::vibrancy;
 
 const CANCEL_COUNTDOWN_SECS: u8 = 3;
 const PILL_WINDOW: &str = "pill";
@@ -775,18 +774,17 @@ async fn start_listening<R: Runtime>(app: &AppHandle<R>, capture: &CaptureHandle
 ///
 /// Applies the last-known content width (see `PILL_LAST_CONTENT_WIDTH`)
 /// right before showing — 2026-08-30 fix: `apply_pill_layout` used to run
-/// unconditionally on every `set_pill_vibrancy_layout` IPC call, including
-/// the one `pill.js` fires immediately on page load while the window is
-/// still hidden (`visible: false` in `tauri.conf.json`). Resizing and
-/// remasking a *hidden* vibrant window turned out to leave a real,
-/// persistent WindowServer compositing ghost — a rectangular blur artifact
-/// with no backing window at all, confirmed via `CGWindowListCopyWindowInfo`
+/// unconditionally on every `set_pill_content_width` IPC call, including
+/// the one `Pill.tsx` fires immediately on page load while the window is
+/// still hidden (`visible: false` in `tauri.conf.json`). Resizing a
+/// *hidden* vibrant window turned out to leave a real, persistent
+/// WindowServer compositing ghost — a rectangular blur artifact with no
+/// backing window at all, confirmed via `CGWindowListCopyWindowInfo`
 /// reporting only the caller's real windows while the ghost stayed visible
 /// on screen regardless, and confirmed tied to this process specifically
 /// since killing it cleared the ghost immediately. `apply_pill_layout` now
-/// only ever touches the real window (size, position, vibrancy mask) while
-/// it's visible or about to become visible right here — never while
-/// genuinely hidden.
+/// only ever touches the real window (size, position) while it's visible
+/// or about to become visible right here — never while genuinely hidden.
 fn reveal_pill<R: Runtime>(app: &AppHandle<R>) {
     if let Some(win) = app.get_webview_window(PILL_WINDOW) {
         // `.show()` first, then layout — `apply_pill_layout` only acts
@@ -896,15 +894,20 @@ fn position_pill_above_dock<R: Runtime>(win: &tauri::WebviewWindow<R>) {
 /// narrower pill state (e.g. `done`'s icon+status vs. `listening`'s
 /// waveform+timer+controls), and native vibrancy's own blur radius bled a
 /// visible soft "wisp" past the pill's rounded end into that dead space —
-/// a real platform limitation (see `vibrancy.rs`'s module docs) that no
-/// amount of mask-geometry tuning could fully hide, since the blur bleeds
-/// from a hard alpha edge regardless of how tightly it's drawn. Shrinking
-/// the window itself to have no dead space left removes the space the
-/// blur had to bleed into, rather than trying to mask around it.
+/// a real platform limitation that no amount of mask-geometry tuning could
+/// fully hide, since the blur bleeds from a hard alpha edge regardless of
+/// how tightly it's drawn. Shrinking the window itself to have no dead
+/// space left removes the space the blur had to bleed into, rather than
+/// trying to mask around it. This is also exactly what lets the pill's
+/// native glass shell (`vibrancy::apply_glass_shell`, see that module's
+/// doc) use one constant corner radius applied once at startup instead of
+/// a per-resize mask: the window's content view is always precisely the
+/// capsule shape, at a fixed height, so there's no dead space left for a
+/// static radius to get wrong.
 ///
-/// Called from `lib.rs`'s `set_pill_vibrancy_layout` command, which
-/// pill.js's `ResizeObserver` on `#pill` drives on load and on every state
-/// change (the pill window itself is `resizable: false` in
+/// Called from `lib.rs`'s `set_pill_content_width` command, which
+/// `Pill.tsx`'s `ResizeObserver` on `#pill` drives on load and on every
+/// state change (the pill window itself is `resizable: false` in
 /// tauri.conf.json, meaning user-*resize*-by-dragging-an-edge is off, but
 /// programmatic resize from here still works, and `data-tauri-drag-region`
 /// separately makes the whole pill draggable *by position* — different
@@ -956,22 +959,26 @@ pub(crate) fn resize_pill_to_content<R: Runtime>(
 /// all) still has a sane value rather than an arbitrary default.
 static PILL_LAST_CONTENT_WIDTH: std::sync::Mutex<f64> = std::sync::Mutex::new(190.0);
 
-/// Applies `content_width` to the real pill window — resize, reposition,
-/// and re-mask its vibrancy layer to match — but only while the window is
-/// actually visible or about to become visible (see `reveal_pill`, the
-/// other caller). Never touches the real window while it's genuinely
-/// hidden.
+/// Applies `content_width` to the real pill window — resize and reposition
+/// to fit — but only while the window is actually visible or about to
+/// become visible (see `reveal_pill`, the other caller). Never touches the
+/// real window while it's genuinely hidden.
 ///
-/// This guard is the actual fix for a real bug (2026-08-30): resizing and
-/// remasking a *hidden* vibrant window left a persistent WindowServer
-/// compositing ghost on screen — a rectangular blur artifact with no
-/// backing window (`CGWindowListCopyWindowInfo` never reported it, even
-/// while it stayed visibly rendered), confirmed tied to this process by
-/// killing it and watching the ghost clear immediately. `pill.js` reports
-/// a layout on every page load regardless of window visibility (the
-/// webview loads and runs JS even while `visible: false`), which used to
-/// mean every single app launch triggered exactly this — not a rare edge
-/// case.
+/// This guard is the actual fix for a real bug (2026-08-30): acting on a
+/// *hidden* vibrant window left a persistent WindowServer compositing
+/// ghost on screen — a rectangular blur artifact with no backing window
+/// (`CGWindowListCopyWindowInfo` never reported it, even while it stayed
+/// visibly rendered), confirmed tied to this process by killing it and
+/// watching the ghost clear immediately. `Pill.tsx` reports a layout on
+/// every page load regardless of window visibility (the webview loads and
+/// runs JS even while `visible: false`), which used to mean every single
+/// app launch triggered exactly this — not a rare edge case.
+///
+/// No vibrancy masking happens here (2026-09-01) — the pill's native glass
+/// shell is applied once, at startup, via `vibrancy::apply_glass_shell`,
+/// and tracks the window's own frame automatically on resize. See
+/// `vibrancy.rs`'s module doc for why this window no longer needs a
+/// per-resize mask the way it used to.
 pub(crate) fn apply_pill_layout<R: Runtime>(win: &tauri::WebviewWindow<R>, content_width: f64) {
     *PILL_LAST_CONTENT_WIDTH
         .lock()
@@ -982,20 +989,6 @@ pub(crate) fn apply_pill_layout<R: Runtime>(win: &tauri::WebviewWindow<R>, conte
     }
 
     resize_pill_to_content(win, content_width);
-
-    let rect = vibrancy::Rect {
-        x: 0.0,
-        y: 0.0,
-        width: content_width.ceil().max(1.0),
-        height: PILL_HEIGHT,
-    };
-    vibrancy::mask_to_shape(
-        win,
-        vibrancy::Shape {
-            radius: vibrancy::capsule_radius(rect),
-            rect,
-        },
-    );
 }
 
 fn hide_pill<R: Runtime>(app: &AppHandle<R>) {

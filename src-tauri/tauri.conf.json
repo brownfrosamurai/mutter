@@ -24,32 +24,21 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
-        "shadow": false,
-        "windowEffects": {
-          "effects": [
-            "hudWindow"
-          ],
-          "state": "active"
-        }
+        "shadow": false
       },
       {
         "label": "dashboard",
         "title": "Mutter",
         "url": "dashboard.html",
-        "width": 600,
-        "height": 460,
+        "width": 520,
+        "height": 400,
         "minWidth": 420,
         "minHeight": 320,
         "resizable": true,
         "decorations": false,
         "transparent": true,
         "visible": false,
-        "windowEffects": {
-          "effects": [
-            "hudWindow"
-          ],
-          "state": "active"
-        }
+        "shadow": false
       },
       {
         "label": "recovery",

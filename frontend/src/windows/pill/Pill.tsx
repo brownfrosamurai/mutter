@@ -28,6 +28,26 @@ const STATUS_TEXT: Record<PillStateName, string> = {
   done: "Done",
 };
 
+// Liquid Glass morph/tint per state (DESIGN.md's "Material system" —
+// unifies the pill's palette with the dashboard's instead of the two
+// surfaces running separate color philosophies). `loading` and `listening`
+// are the pill's wide states (two lines of text; waveform + timer +
+// controls) so they morph "thick"; `canceling` also runs wide (countdown
+// numeral); `done` is narrow, so it stays "thin" — deeper shadow/blur is
+// reserved for the states that are actually visually larger.
+const PILL_TINT: Record<PillStateName, "violet" | "red" | "green" | undefined> = {
+  loading: undefined,
+  listening: "violet",
+  canceling: "red",
+  done: "green",
+};
+const PILL_THICK: Record<PillStateName, boolean> = {
+  loading: true,
+  listening: true,
+  canceling: true,
+  done: false,
+};
+
 const WAVEFORM_BAR_COUNT = 5;
 // Static fallback heights for prefers-reduced-motion — still reads as a
 // waveform shape, just frozen, not flat bars (see the pre-rewrite pill's
@@ -69,11 +89,10 @@ export function Pill() {
     };
   }, []);
 
-  // Reports #pill's real rendered width to Rust so the native vibrancy
-  // layer resizes/masks itself to exactly that shape — see
-  // session::apply_pill_layout's docs (src-tauri) for why this is the
-  // one piece of native-vibrancy machinery a React rewrite still has to
-  // replicate. Debounced via a single requestAnimationFrame guard,
+  // Reports #pill's real rendered width to Rust so the native window
+  // resizes to exactly fit it — see session::apply_pill_layout's docs
+  // (src-tauri) for why the window itself (not just CSS) has to track
+  // content width. Debounced via a single requestAnimationFrame guard,
   // mirroring the original vanilla JS exactly — this is what the
   // pre-rewrite pill needed to fix a real double-fire compositing-seam
   // bug (ResizeObserver's spec-guaranteed initial callback firing
@@ -87,13 +106,7 @@ export function Pill() {
       if (rafRef.current !== null) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
-        const rect = el.getBoundingClientRect();
-        void commands.setPillVibrancyLayout({
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        });
+        void commands.setPillContentWidth(el.getBoundingClientRect().width);
       });
     };
 
@@ -108,9 +121,32 @@ export function Pill() {
   }, []);
 
   const showWaveform = state === "listening";
-  const showDot = state === "canceling" || state === "done";
+  // One consistent status-dot language across every active state (preview's
+  // exact treatment — listening/canceling/done all read via the same dot +
+  // glow, not a one-off mic icon reserved for listening alone). `loading`
+  // has no dot — the preview never depicted that state.
+  const showDot = state === "listening" || state === "canceling" || state === "done";
   const showText = state !== "listening";
-  const dotColor = state === "canceling" ? "var(--danger)" : "var(--success)";
+  const dotColor =
+    state === "canceling" ? "var(--danger)" : state === "done" ? "var(--success)" : "var(--accent-violet)";
+  // Soft glow halo, matching the design-consultation preview's dot treatment
+  // exactly (0 0 8px at 90% alpha) — a state-colored light source, not just
+  // a flat marker.
+  const dotGlow =
+    state === "canceling"
+      ? "rgba(255, 69, 58, 0.9)"
+      : state === "done"
+        ? "rgba(48, 209, 88, 0.9)"
+        : "rgba(139, 124, 246, 0.9)";
+
+  const pillClasses = [
+    "glass-panel",
+    PILL_THICK[state] && "glass-panel--thick",
+    PILL_TINT[state] && `glass-panel--tint-${PILL_TINT[state]}`,
+    "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-pill px-4 text-text-primary",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -118,27 +154,14 @@ export function Pill() {
       id="pill"
       data-tauri-drag-region
       data-state={state}
-      className="glass-panel inline-flex h-9 items-center gap-pill-sm whitespace-nowrap rounded-pill px-pill-md text-text-primary"
+      className={pillClasses}
     >
       {showDot && (
         <span
           aria-hidden="true"
           className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: dotColor }}
+          style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotGlow}` }}
         />
-      )}
-
-      {state === "listening" && (
-        <svg
-          aria-hidden="true"
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          className="shrink-0 text-accent-violet"
-        >
-          <circle cx="7" cy="5" r="3" fill="currentColor" />
-          <path d="M3 7a4 4 0 0 0 8 0M7 11v2" stroke="currentColor" strokeWidth="1.2" fill="none" />
-        </svg>
       )}
 
       {showWaveform && (

@@ -9,7 +9,7 @@ import { HistoryPanel } from "./panels/History";
 import { SettingsPanel } from "./panels/Settings";
 
 const PANEL_TITLE: Record<PanelId, string> = {
-  stats: "Stats",
+  stats: "Metrics",
   history: "History",
   settings: "Settings",
 };
@@ -21,12 +21,23 @@ const PANEL_TITLE: Record<PanelId, string> = {
  * uniformly, same proven mechanism as pill/recovery — see lib.rs's `run()`
  * setup() comment for the full history). The gap around the floating
  * sidebar is also vibrant now, not real unblurred desktop — a deliberate
- * trade for reliability over the masking approach's edge-bleed risk. */
+ * trade for reliability over the masking approach's edge-bleed risk.
+ *
+ * **Shell corners, 2026-09-01 — attempted, reverted, not shipped.** A
+ * single-shape native mask (reusing the pill's proven `mask_to_shape`) was
+ * tried here to round the window's outer corners, user-directed. Live
+ * screenshots and native NSLog diagnostics confirmed the reported rect
+ * exactly matched the real vibrancy view's own bounds, yet the rendered
+ * result stayed square at the top regardless — even a deliberately wrong,
+ * drastically inset test rect produced no visible change at all. See
+ * `lib.rs`'s `reveal_dashboard` doc comment for the full writeup. Root
+ * cause not found; this is the same fragility class already documented for
+ * the dashboard's vibrancy in the paragraph above. */
 export function App() {
   const [active, setActive] = useState<PanelId>("stats");
 
   return (
-    <div className="flex h-screen gap-3 p-1">
+    <div className="flex h-screen gap-3 p-5 ">
       <Sidebar
         active={active}
         onSelect={setActive}
@@ -35,7 +46,10 @@ export function App() {
         }}
       />
 
-      <GlassPanel className="relative flex-1 overflow-hidden rounded-panel">
+      <GlassPanel
+        thick
+        className="relative flex-1 overflow-hidden rounded-panel"
+      >
         <div
           data-tauri-drag-region
           className="absolute inset-x-0 top-0 z-10 flex h-11 items-center justify-between px-4"
@@ -47,7 +61,7 @@ export function App() {
           <span className="w-[52px]" aria-hidden="true" />
         </div>
 
-        <div className="h-full select-none overflow-y-auto px-4 pb-4 pt-14">
+        <div className="h-full select-none overflow-y-auto px-4 pb-4 pt-12">
           <ErrorBoundary key={active}>
             {active === "stats" && <StatsPanel />}
             {active === "history" && <HistoryPanel />}

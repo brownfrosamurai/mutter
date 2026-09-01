@@ -20,21 +20,21 @@ export function Ready() {
         later in Settings.
       </p>
       <div className="mt-4 flex flex-col gap-2">
-        <div className="flex items-center justify-between rounded-small border border-glass-border bg-surface-inset px-3 py-2">
+        <div className="flex items-center justify-between rounded-small bg-surface-inset px-3 py-2">
           <span className="flex items-center gap-2 text-sm text-text-primary">
             <Mic size={14} strokeWidth={2} />
             Mic Dictation
           </span>
-          <span className="rounded-small border border-glass-border bg-surface-toggle-track px-2 py-1 font-mono text-sm text-text-primary">
+          <span className="rounded-[5px] bg-[rgba(255,255,255,0.08)] px-2 py-1 font-mono text-sm text-text-primary">
             {settings.data ? toSymbols(settings.data.mic_hotkey) : "…"}
           </span>
         </div>
-        <div className="flex items-center justify-between rounded-small border border-glass-border bg-surface-inset px-3 py-2">
+        <div className="flex items-center justify-between rounded-small bg-surface-inset px-3 py-2">
           <span className="flex items-center gap-2 text-sm text-text-primary">
             <Monitor size={14} strokeWidth={2} />
             System Audio
           </span>
-          <span className="rounded-small border border-glass-border bg-surface-toggle-track px-2 py-1 font-mono text-sm text-text-primary">
+          <span className="rounded-[5px] bg-[rgba(255,255,255,0.08)] px-2 py-1 font-mono text-sm text-text-primary">
             {settings.data ? toSymbols(settings.data.system_audio_hotkey) : "…"}
           </span>
         </div>

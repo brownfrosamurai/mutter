@@ -6,9 +6,6 @@ fn main() {
 
     #[cfg(target_os = "macos")]
     build_permissions_shim();
-
-    #[cfg(target_os = "macos")]
-    build_vibrancy_mask_shim();
 }
 
 /// Compiles `native/system_audio_shim.m` — the ScreenCaptureKit build-time
@@ -55,24 +52,4 @@ fn build_permissions_shim() {
         .compile("mutter_permissions_shim");
 
     println!("cargo:rustc-link-lib=framework=AVFoundation");
-}
-
-/// Compiles `native/vibrancy_mask_shim.m` — see `src/vibrancy.rs` and the
-/// shim header for why this exists: `windowEffects.radius`
-/// (`tauri.conf.json`) is unusable, because it routes through
-/// window-vibrancy's undocumented-private-API `setCornerRadius:` and blanks
-/// WKWebView content. This shim reshapes the vibrancy view's corners via
-/// AppKit's public `NSVisualEffectView.maskImage` instead.
-#[cfg(target_os = "macos")]
-fn build_vibrancy_mask_shim() {
-    println!("cargo:rerun-if-changed=native/vibrancy_mask_shim.m");
-    println!("cargo:rerun-if-changed=native/vibrancy_mask_shim.h");
-
-    cc::Build::new()
-        .file("native/vibrancy_mask_shim.m")
-        .flag("-fobjc-arc")
-        .flag("-fmodules")
-        .compile("mutter_vibrancy_mask_shim");
-
-    println!("cargo:rustc-link-lib=framework=AppKit");
 }
