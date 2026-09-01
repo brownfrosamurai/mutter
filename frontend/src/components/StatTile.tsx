@@ -15,7 +15,7 @@ export function StatTile({ label, value, sub }: StatTileProps) {
   return (
     <div>
       <div className="text-xs uppercase tracking-wide text-text-secondary">{label}</div>
-      <div className="mt-1 font-rounded text-[18px] leading-none tracking-tight text-text-primary [font-variant-numeric:tabular-nums] [font-weight:650]">
+      <div className="mt-1 font-rounded text-[17px] leading-none tracking-tight text-text-primary [font-variant-numeric:tabular-nums] [font-weight:650]">
         {value}
       </div>
       <div className="mt-1 text-xs text-text-secondary">{sub}</div>

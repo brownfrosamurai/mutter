@@ -31,7 +31,7 @@ const NAV_ITEMS: { id: PanelId; label: string; icon: typeof BarChart3 }[] = [
  * card via the window's uniform native vibrancy underneath both. */
 export function Sidebar({ active, onSelect, onQuit }: SidebarProps) {
   return (
-    <GlassPanel className="flex w-9 flex-col items-center gap-1 self-center rounded-pill py-2">
+    <GlassPanel className="flex w-10 flex-col items-center gap-1 self-center rounded-pill py-2">
       <div
         aria-hidden="true"
         className="mb-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-text-primary"

@@ -128,14 +128,23 @@ export function Pill() {
   }, []);
 
   const showWaveform = state === "listening";
-  const showDot = state === "canceling" || state === "done";
+  // One consistent status-dot language across every active state (preview's
+  // exact treatment — listening/canceling/done all read via the same dot +
+  // glow, not a one-off mic icon reserved for listening alone). `loading`
+  // has no dot — the preview never depicted that state.
+  const showDot = state === "listening" || state === "canceling" || state === "done";
   const showText = state !== "listening";
-  const dotColor = state === "canceling" ? "var(--danger)" : "var(--success)";
+  const dotColor =
+    state === "canceling" ? "var(--danger)" : state === "done" ? "var(--success)" : "var(--accent-violet)";
   // Soft glow halo, matching the design-consultation preview's dot treatment
   // exactly (0 0 8px at 90% alpha) — a state-colored light source, not just
   // a flat marker.
   const dotGlow =
-    state === "canceling" ? "rgba(255, 69, 58, 0.9)" : "rgba(48, 209, 88, 0.9)";
+    state === "canceling"
+      ? "rgba(255, 69, 58, 0.9)"
+      : state === "done"
+        ? "rgba(48, 209, 88, 0.9)"
+        : "rgba(139, 124, 246, 0.9)";
 
   const pillClasses = [
     "glass-panel",
@@ -160,19 +169,6 @@ export function Pill() {
           className="h-2 w-2 shrink-0 rounded-full"
           style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotGlow}` }}
         />
-      )}
-
-      {state === "listening" && (
-        <svg
-          aria-hidden="true"
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          className="shrink-0 text-accent-violet"
-        >
-          <circle cx="7" cy="5" r="3" fill="currentColor" />
-          <path d="M3 7a4 4 0 0 0 8 0M7 11v2" stroke="currentColor" strokeWidth="1.2" fill="none" />
-        </svg>
       )}
 
       {showWaveform && (
