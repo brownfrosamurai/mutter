@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required for AVCaptureDevice.requestAccess(for: .audio) to show the
+	     real system permission prompt (native/permissions_shim.m's
+	     mutter_request_mic_access) — without this key, macOS silently
+	     returns "denied" with no UI at all rather than prompting, since it
+	     has no string to show the user. Tauri auto-merges this file (same
+	     directory as tauri.conf.json) into the bundled Info.plist — see
+	     tauri-utils's MacConfig::info_plist doc comment. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mutter needs microphone access to transcribe your speech into text. Audio is processed entirely on your Mac and never leaves your device.</string>
+</dict>
+</plist>

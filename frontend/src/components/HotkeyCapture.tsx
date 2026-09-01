@@ -1,29 +1,11 @@
 import { useEffect, useState } from "react";
+import { toSymbols } from "@/lib/hotkey";
 
 interface HotkeyCaptureProps {
   title: string;
   description: string;
   shortcut: string; // Tauri shortcut string, e.g. "CmdOrCtrl+Shift+Space"
   onCapture: (shortcut: string) => Promise<void>;
-}
-
-/** Renders a Tauri shortcut string as keycap symbols, e.g.
- * "CmdOrCtrl+Shift+Space" -> "⌘⇧Space" — matches the reference screenshots'
- * keycap badge look. macOS-only (this app's hard constraint), so
- * CmdOrCtrl always renders as ⌘. */
-function toSymbols(shortcut: string): string {
-  const parts = shortcut.split("+");
-  const key = parts.pop() ?? "";
-  const symbolFor: Record<string, string> = {
-    CmdOrCtrl: "⌘",
-    Cmd: "⌘",
-    Ctrl: "⌃",
-    Alt: "⌥",
-    Option: "⌥",
-    Shift: "⇧",
-  };
-  const modifiers = parts.map((m) => symbolFor[m] ?? m).join("");
-  return `${modifiers} ${key}`;
 }
 
 /** Layout-independent physical-key mapping (KeyboardEvent.code, not .key) to

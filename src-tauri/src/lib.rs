@@ -253,6 +253,141 @@ fn get_permission_status() -> PermissionStatusDto {
     }
 }
 
+/// Which permission a Grant button targets — one enum instead of a
+/// stringly-typed `kind: String` (matches `SettingField`'s own established
+/// pattern, D3 from the frontend-rewrite plan). Shared by the onboarding
+/// window's Permissions step and the dashboard's Settings panel.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionKind {
+    Microphone,
+    Accessibility,
+    ScreenRecording,
+}
+
+/// Deep-links to the matching System Settings pane for Accessibility and
+/// Screen Recording (macOS has no active-request API for either — unlike
+/// mic, see `request_mic_access` below). Also the fallback path for mic
+/// once its one-shot native prompt (`request_mic_access`) has already been
+/// answered, since that prompt won't show again.
+///
+/// `async` + `spawn_blocking`, matching `request_mic_access` right below —
+/// a plain sync `#[tauri::command]` runs on the same thread that dispatches
+/// the IPC message (the main/UI thread for the default wry/WKWebView
+/// backend), so `Command::status()`'s blocking wait for `open` to launch
+/// would otherwise stall the UI for however long that takes (review finding,
+/// caught by inconsistency with the sibling command below it).
+#[tauri::command]
+#[specta::specta]
+async fn open_permission_settings(kind: PermissionKind) -> Result<(), String> {
+    let url = match kind {
+        PermissionKind::Microphone => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        }
+        PermissionKind::Accessibility => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        }
+        PermissionKind::ScreenRecording => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        }
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        std::process::Command::new("open")
+            .arg(url)
+            .status()
+            .map_err(|e| format!("failed to open System Settings: {e}"))
+    })
+    .await
+    .map_err(|e| format!("open-settings task panicked: {e}"))??;
+    Ok(())
+}
+
+/// Shows the real native macOS mic-permission prompt (Outside Voice finding
+/// #2 from the onboarding-flow plan review — mic gets an active request,
+/// unlike Accessibility/Screen Recording, which stay on
+/// `open_permission_settings` above). Blocking, so it's dispatched onto
+/// Tauri's blocking-task pool rather than the async command's own task —
+/// never call the underlying native function from the main thread.
+#[tauri::command]
+#[specta::specta]
+async fn request_mic_access() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut gate = permissions::PermissionGate::<permissions::Mic>::new();
+        gate.request()
+    })
+    .await
+    .map_err(|e| format!("mic permission request task panicked: {e}"))
+}
+
+/// Marks onboarding as finished — persisted so it never shows again — then
+/// closes the onboarding window and shows the dashboard. Awaited by the
+/// frontend with its "Open Dashboard" button disabled while pending, so a
+/// `settings.json` save failure (disk full, permissions) surfaces as a
+/// real error instead of silently leaving `onboarding_completed=false`
+/// (which would otherwise only be discoverable as "onboarding weirdly
+/// reappears next launch").
+#[tauri::command]
+#[specta::specta]
+fn complete_onboarding(
+    app: tauri::AppHandle,
+    settings_state: tauri::State<Mutex<settings::AppSettings>>,
+) -> Result<(), String> {
+    {
+        let mut settings = settings_state
+            .inner()
+            .lock()
+            .expect("settings lock poisoned");
+        settings.onboarding_completed = true;
+        settings
+            .save()
+            .map_err(|e| format!("onboarding finished but failed to persist to disk: {e}"))?;
+    }
+    if let Some(win) = app.get_webview_window("onboarding") {
+        let _ = win.close();
+    }
+    if let Some(win) = app.get_webview_window("dashboard") {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+    Ok(())
+}
+
+/// The onboarding-vs-recovery priority decision from `setup()`, pulled out
+/// as a pure function so it's unit-testable without standing up a real
+/// `tauri::App` — recovery mode must always win, regardless of
+/// `onboarding_completed`, so a fresh install whose history DB is somehow
+/// already corrupt shows recovery, never onboarding (review finding: this
+/// contract was documented in comments and in the onboarding-flow plan's
+/// Implementation Tasks checklist, but never actually had a test).
+fn should_show_onboarding(in_recovery: bool, onboarding_completed: bool) -> bool {
+    !in_recovery && !onboarding_completed
+}
+
+#[cfg(test)]
+mod onboarding_tests {
+    use super::should_show_onboarding;
+
+    #[test]
+    fn shows_onboarding_only_when_not_in_recovery_and_not_completed() {
+        assert!(should_show_onboarding(false, false));
+    }
+
+    #[test]
+    fn recovery_mode_wins_even_if_onboarding_was_never_completed() {
+        assert!(!should_show_onboarding(true, false));
+    }
+
+    #[test]
+    fn recovery_mode_wins_even_if_onboarding_was_already_completed() {
+        assert!(!should_show_onboarding(true, true));
+    }
+
+    #[test]
+    fn already_completed_onboarding_never_shows_again() {
+        assert!(!should_show_onboarding(false, true));
+    }
+}
+
 /// Backs the dashboard sidebar's quit button. The tray menu's predefined
 /// "Quit" item (see `run()`) is the primary quit path; this is the same
 /// action reachable from the dashboard itself, per the reference mockup's
@@ -551,6 +686,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         get_history_page,
         copy_history_text,
         get_permission_status,
+        open_permission_settings,
+        request_mic_access,
+        complete_onboarding,
         quit_app,
         get_recovery_info,
         get_settings,
@@ -569,6 +707,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app| {
             // Menu-bar-only app, no dock icon — set at runtime rather than
@@ -596,6 +735,7 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             let app_settings = settings::AppSettings::load();
+            let onboarding_completed = app_settings.onboarding_completed;
             let grammar_llm_cleanup_enabled = Arc::new(AtomicBool::new(
                 app_settings.grammar_llm_cleanup_enabled,
             ));
@@ -675,6 +815,31 @@ pub fn run() {
                 }
             };
             let in_recovery = recovery_info.0.is_some();
+
+            // First-run onboarding (docs/designs/onboarding-flow-plan.md).
+            // Recovery mode takes priority by construction — checked first,
+            // above — so a fresh install whose history DB is somehow
+            // already corrupt shows recovery, never onboarding. Otherwise,
+            // an unset `onboarding_completed` (both a genuinely fresh
+            // install and an existing user's `settings.json` from before
+            // this field existed — the same `#[serde(default)]` false)
+            // shows the onboarding window instead of leaving pill/dashboard
+            // in their normal hidden-until-summoned state. `set_focus()`
+            // mirrors `recovery`'s own exact pattern above — the app runs
+            // `ActivationPolicy::Accessory` (no Dock icon), so a newly-shown
+            // window does not auto-foreground on its own.
+            //
+            // The priority decision itself (`should_show_onboarding`) is a
+            // pure function specifically so this branch ordering — the one
+            // real behavioral contract onboarding adds to `setup()` — is
+            // unit-testable without standing up a real `tauri::App`.
+            if should_show_onboarding(in_recovery, onboarding_completed) {
+                if let Some(win) = app.get_webview_window("onboarding") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+            }
+
             app.manage(session_handle);
             app.manage(history_for_dashboard);
             app.manage(recovery_info);

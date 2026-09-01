@@ -85,6 +85,12 @@ extern "C" {
     /// Defined in native/permissions_shim.m. Mirrors `AVAuthorizationStatus`
     /// exactly: 0 = NotDetermined, 1 = Restricted, 2 = Denied, 3 = Authorized.
     fn mutter_mic_auth_status() -> i32;
+
+    /// Defined in native/permissions_shim.m. Shows the real native mic
+    /// permission prompt and blocks until answered (or returns immediately
+    /// if already answered). Returns 1 if granted, 0 otherwise. Callers
+    /// MUST NOT invoke this on the main thread — see the shim header.
+    fn mutter_request_mic_access() -> i32;
 }
 
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -110,6 +116,25 @@ impl PermissionGate<Mic> {
                 PermissionState::Unavailable
             }
         };
+    }
+
+    /// Shows the real native mic permission prompt (a one-time system
+    /// dialog — a no-op returning the existing status if already answered)
+    /// and updates `self` to match the real post-prompt status. Blocking —
+    /// callers MUST run this off the main/UI thread (see
+    /// `lib.rs`'s `request_mic_access` command, which wraps it in
+    /// `tauri::async_runtime::spawn_blocking`).
+    ///
+    /// Deliberately untested, unlike its siblings' `_does_not_panic` smoke
+    /// tests below (review finding): a real test would trigger the actual
+    /// system dialog and hang CI waiting for a human to answer it. See
+    /// `TODOS.md`'s "Onboarding's mic native-prompt path" entry — this
+    /// exact path is already flagged as needing live human verification,
+    /// which is a stronger check than a CI smoke test could give anyway.
+    pub fn request(&mut self) -> bool {
+        let granted = unsafe { mutter_request_mic_access() } != 0;
+        self.refresh();
+        granted
     }
 }
 

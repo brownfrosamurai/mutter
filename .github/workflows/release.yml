@@ -1,0 +1,48 @@
+name: release
+
+# Builds and publishes a GitHub Release whenever a `v*` tag is pushed — this
+# is the "new build available" the app's own updater checks for (Settings ->
+# Software update -> Check for Updates), via the `latest.json` manifest
+# `tauri-action` generates and attaches to the release automatically.
+#
+# Signing note: `src-tauri/tauri.conf.json`'s own `signingIdentity` is
+# "Mutter Dev Signing" — a self-signed certificate that only exists in the
+# maintainer's local keychain, not on a fresh GitHub-hosted runner. CI
+# overrides it to ad-hoc ("-") via `--config`, matching this project's
+# existing "zero paid resources for v1" constraint (no paid Apple Developer
+# notarization either way) — see CLAUDE.md. The update *payload* itself is
+# still Ed25519-signed by tauri-action (TAURI_SIGNING_PRIVATE_KEY secrets
+# below) so the updater can verify authenticity independent of the OS code
+# signature.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Mutter ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 // Tauri's own recommended Vite setup for a multi-window app: one HTML entry
-// per window (dashboard/pill/recovery), a fixed dev-server port matching
+// per window (dashboard/pill/recovery/onboarding), a fixed dev-server port matching
 // tauri.conf.json's `build.devUrl`, and HMR tuned for the Tauri host
 // (ignoring src-tauri/ so a Rust rebuild doesn't also trigger a frontend
 // reload) — see https://tauri.app/develop/#vite.
@@ -20,6 +20,7 @@ export default defineConfig({
         dashboard: resolve(__dirname, "dashboard.html"),
         pill: resolve(__dirname, "pill.html"),
         recovery: resolve(__dirname, "recovery.html"),
+        onboarding: resolve(__dirname, "onboarding.html"),
       },
     },
   },

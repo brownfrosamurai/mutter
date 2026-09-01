@@ -81,6 +81,15 @@ pub struct AppSettings {
     /// heuristic, documented ceiling in `engine/grammar.rs`.
     #[serde(default = "true_default")]
     pub apply_spoken_corrections: bool,
+
+    /// Gates the onboarding window (`lib.rs`'s `setup()`) — `false` for
+    /// both brand-new installs and any existing `settings.json` predating
+    /// this field (`#[serde(default)]`'s zero value), so an upgrading user
+    /// sees onboarding once too, same as a fresh install. Never reset by
+    /// this app itself once `true` — "redo onboarding" was explicitly
+    /// scoped out (see the onboarding-flow plan's NOT-in-scope section).
+    #[serde(default)]
+    pub onboarding_completed: bool,
 }
 
 impl Default for AppSettings {
@@ -96,6 +105,7 @@ impl Default for AppSettings {
             remove_filler_words: true,
             spoken_formatting: true,
             apply_spoken_corrections: true,
+            onboarding_completed: false,
         }
     }
 }
@@ -222,6 +232,18 @@ mod tests {
         assert!(parsed.remove_filler_words);
         assert!(parsed.spoken_formatting);
         assert!(parsed.apply_spoken_corrections);
+    }
+
+    #[test]
+    fn onboarding_completed_defaults_to_false_when_missing_from_json() {
+        // Backward compatibility: an existing user's settings.json (written
+        // before onboarding existed) must not silently skip the onboarding
+        // flow — false is the "not seen it yet" state for both a fresh
+        // install and an upgrading existing user.
+        let json =
+            r#"{"mic_hotkey":"CmdOrCtrl+Shift+Space","system_audio_hotkey":"CmdOrCtrl+Shift+M"}"#;
+        let parsed: AppSettings = serde_json::from_str(json).unwrap();
+        assert!(!parsed.onboarding_completed);
     }
 
     #[test]

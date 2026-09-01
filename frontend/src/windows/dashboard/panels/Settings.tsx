@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { commands, type SettingField } from "@/lib/bindings";
 import { SettingRow } from "@/components/SettingRow";
 import { HotkeyCapture } from "@/components/HotkeyCapture";
-
-const PERMISSION_LABEL: Record<string, string> = {
-  granted: "Granted",
-  denied: "Denied — enable in System Settings",
-  not_requested: "Not yet requested",
-  unavailable: "Unavailable on this device",
-};
+import { PermissionRow, type PermissionRowKind } from "@/components/PermissionRow";
+import { usePermissionsQuery } from "@/lib/hooks";
 
 /** Every new toggle (D3's SettingField union) — title/description matches
  * the reference screenshots, with one deliberate wording adjustment
@@ -58,6 +55,113 @@ const OUTPUT_TOGGLES: { field: SettingField; title: string; description: string 
   },
 ];
 
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "up-to-date" }
+  | { kind: "available"; update: Update }
+  | { kind: "downloading"; percent: number | null }
+  | { kind: "ready" }
+  | { kind: "error"; message: string };
+
+/** Real `tauri-plugin-updater` flow, not a placeholder — `check()` hits the
+ * endpoint pinned in tauri.conf.json (a `latest.json` manifest published by
+ * the repo's own GitHub Actions release workflow, `.github/workflows/
+ * release.yml`), and a found update is Ed25519-verified against the pubkey
+ * already pinned there before anything downloads. `downloadAndInstall`
+ * replaces the app bundle on disk; `relaunch` (a separate plugin,
+ * `tauri-plugin-process`) is the one explicit step needed to actually run
+ * the new binary — the updater itself never restarts the app on its own. */
+function UpdateRow() {
+  const [state, setState] = useState<UpdateState>({ kind: "idle" });
+
+  async function handleCheck() {
+    setState({ kind: "checking" });
+    try {
+      const update = await check();
+      setState(update ? { kind: "available", update } : { kind: "up-to-date" });
+    } catch (e) {
+      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleInstall(update: Update) {
+    setState({ kind: "downloading", percent: null });
+    try {
+      let downloaded = 0;
+      let total: number | undefined;
+      await update.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          total = event.data.contentLength;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          setState({
+            kind: "downloading",
+            percent: total ? Math.round((downloaded / total) * 100) : null,
+          });
+        }
+      });
+      setState({ kind: "ready" });
+    } catch (e) {
+      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const statusText = (() => {
+    switch (state.kind) {
+      case "idle":
+        return "Check GitHub Releases for a newer build.";
+      case "checking":
+        return "Checking…";
+      case "up-to-date":
+        return "You're on the latest version.";
+      case "available":
+        return `Version ${state.update.version} is available.`;
+      case "downloading":
+        return state.percent === null ? "Downloading…" : `Downloading… ${state.percent}%`;
+      case "ready":
+        return "Downloaded — restart to finish updating.";
+      case "error":
+        return state.message;
+    }
+  })();
+
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-glass-border py-3 last:border-b-0">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-text-primary">Software update</div>
+        <div className="mt-0.5 text-xs text-text-secondary">{statusText}</div>
+      </div>
+      {state.kind === "available" ? (
+        <button
+          type="button"
+          onClick={() => void handleInstall(state.update)}
+          className="shrink-0 rounded-small border border-glass-border bg-surface-toggle-track px-3 py-1.5 text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          Install
+        </button>
+      ) : state.kind === "ready" ? (
+        <button
+          type="button"
+          onClick={() => void relaunch()}
+          className="shrink-0 rounded-small border border-glass-border bg-surface-toggle-track px-3 py-1.5 text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          Restart
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleCheck()}
+          disabled={state.kind === "checking" || state.kind === "downloading"}
+          className="shrink-0 rounded-small border border-glass-border bg-surface-toggle-track px-3 py-1.5 text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+        >
+          {state.kind === "checking" ? "Checking…" : "Check for Updates"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPanel() {
   const queryClient = useQueryClient();
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -66,10 +170,7 @@ export function SettingsPanel() {
     queryKey: ["settings"],
     queryFn: () => commands.getSettings(),
   });
-  const permissions = useQuery({
-    queryKey: ["permissions"],
-    queryFn: () => commands.getPermissionStatus(),
-  });
+  const permissions = usePermissionsQuery();
 
   async function handleToggle(field: SettingField, enabled: boolean) {
     // Optimistic update, reverted on error — same pattern as the pre-
@@ -125,22 +226,29 @@ export function SettingsPanel() {
       <section>
         <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Permissions</h2>
         <div>
-          {(["mic", "accessibility", "system_audio"] as const).map((key) => (
-            <div key={key} className="flex items-center justify-between border-b border-glass-border py-2 last:border-b-0">
-              <span className="setting-label text-sm text-text-primary">
-                {key === "mic" ? "Microphone" : key === "accessibility" ? "Accessibility" : "Screen Recording"}
-              </span>
-              <span className="text-xs text-text-secondary">
-                {permissions.data ? PERMISSION_LABEL[permissions.data[key]] : "Checking…"}
-              </span>
-            </div>
-          ))}
+          {(["mic", "accessibility", "system_audio"] as const satisfies readonly PermissionRowKind[]).map(
+            (key) => (
+              <PermissionRow
+                key={key}
+                kind={key}
+                status={permissions.data?.[key]}
+                onGrantAttempted={() => void permissions.refetch()}
+              />
+            ),
+          )}
           <div className="flex items-center justify-between border-b border-glass-border py-2 last:border-b-0">
             <span className="setting-label text-sm text-text-primary">Engine</span>
             <span className="text-xs text-text-secondary" title="Apple Speech was not built — Whisper already won the Phase 0 benchmark for English.">
               Whisper (small) — English
             </span>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Updates</h2>
+        <div>
+          <UpdateRow />
         </div>
       </section>
 

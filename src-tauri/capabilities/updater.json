@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dashboard-updater",
+  "description": "The dashboard's Settings panel is the only place that checks for and installs updates (a 'Check for Updates' row) — scoped to that window only, same one-capability-file-per-concern pattern as pill-drag.json/pill.json. process:allow-restart is the one follow-up action an installed update needs (the JS API is named relaunch(), but the underlying permission/command tauri-plugin-process exposes is 'restart').",
+  "windows": ["dashboard"],
+  "permissions": [
+    "updater:default",
+    "process:allow-restart"
+  ]
+}

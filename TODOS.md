@@ -62,6 +62,17 @@ language understanding instead. Same "wait for real dogfooding signal
 before building" discipline this project already applied before building
 Option B itself in the first place — not built speculatively now.
 
+## Onboarding's mic native-prompt path — needs a human to verify directly
+
+**Built 2026-08-31 (onboarding flow, `docs/designs/onboarding-flow-plan.md`), live-verification inconclusive.** `request_mic_access` (`lib.rs`) → `mutter_request_mic_access` (`native/permissions_shim.m`) calls `AVCaptureDevice.requestAccessForMediaType:completionHandler:`, dispatched onto the main queue and blocked on via a semaphore. Two real bugs were found and fixed while live-testing this on the actual installed app:
+
+1. `Info.plist` had no `NSMicrophoneUsageDescription` key at all (now added, `src-tauri/Info.plist`, auto-merged by Tauri) — without it, macOS can't show a prompt UI and silently returns denied.
+2. The AVFoundation call was originally made directly on the Rust `spawn_blocking` thread (never the main thread) — verified live that this alone also produces an instant silent denial, no prompt shown. Fixed by dispatching the actual call onto the main queue while keeping the blocking wait on the background thread.
+
+After both fixes, repeated clicks on the onboarding/Settings "Grant" button for Microphone (via synthetic `CGEventPost` clicks, cursor-position-verified) still never produced a visible system dialog, and the app never even appeared in System Settings → Privacy & Security → Microphone's app list (which should happen the moment a request is made, granted or denied). `tccutil reset Microphone com.femimeduna.mutter` was used between attempts to rule out stale state. This is the same category of gap this project has hit before (T12's terminal-injection test, the pill-drag gesture) — synthetic input/native-permission-UI interaction doesn't always replicate faithfully under agent automation; a real human click is needed to confirm whether the dialog now appears with both fixes in place, or whether a third issue remains (possibly related to the self-signed, non-notarized dev build).
+
+Both fallback paths (Accessibility/Screen Recording's "open System Settings" Grant, and mic's own denied-state fallback to System Settings) were confirmed working live — this TODO is specifically about the first-run *native prompt* path for mic.
+
 ## DONE — Grammar cleanup Option B (local-LLM cleanup)
 
 Built 2026-08-30 (`engine/llm_cleanup.rs`, `engine/pipeline.rs`), ahead of

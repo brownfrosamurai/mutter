@@ -84,6 +84,54 @@ async getPermissionStatus() : Promise<PermissionStatusDto> {
     return await TAURI_INVOKE("get_permission_status");
 },
 /**
+ * Deep-links to the matching System Settings pane for Accessibility and
+ * Screen Recording (macOS has no active-request API for either — unlike
+ * mic, see `request_mic_access` below). Also the fallback path for mic
+ * once its one-shot native prompt (`request_mic_access`) has already been
+ * answered, since that prompt won't show again.
+ */
+async openPermissionSettings(kind: PermissionKind) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_permission_settings", { kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Shows the real native macOS mic-permission prompt (Outside Voice finding
+ * #2 from the onboarding-flow plan review — mic gets an active request,
+ * unlike Accessibility/Screen Recording, which stay on
+ * `open_permission_settings` above). Blocking, so it's dispatched onto
+ * Tauri's blocking-task pool rather than the async command's own task —
+ * never call the underlying native function from the main thread.
+ */
+async requestMicAccess() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("request_mic_access") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Marks onboarding as finished — persisted so it never shows again — then
+ * closes the onboarding window and shows the dashboard. Awaited by the
+ * frontend with its "Open Dashboard" button disabled while pending, so a
+ * `settings.json` save failure (disk full, permissions) surfaces as a
+ * real error instead of silently leaving `onboarding_completed=false`
+ * (which would otherwise only be discoverable as "onboarding weirdly
+ * reappears next launch").
+ */
+async completeOnboarding() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("complete_onboarding") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Backs the dashboard sidebar's quit button. The tray menu's predefined
  * "Quit" item (see `run()`) is the primary quit path; this is the same
  * action reachable from the dashboard itself, per the reference mockup's
@@ -230,7 +278,16 @@ spoken_formatting?: boolean;
  * the correction. New in the frontend-rewrite plan; rule-based
  * heuristic, documented ceiling in `engine/grammar.rs`.
  */
-apply_spoken_corrections?: boolean }
+apply_spoken_corrections?: boolean; 
+/**
+ * Gates the onboarding window (`lib.rs`'s `setup()`) — `false` for
+ * both brand-new installs and any existing `settings.json` predating
+ * this field (`#[serde(default)]`'s zero value), so an upgrading user
+ * sees onboarding once too, same as a fresh install. Never reset by
+ * this app itself once `true` — "redo onboarding" was explicitly
+ * scoped out (see the onboarding-flow plan's NOT-in-scope section).
+ */
+onboarding_completed?: boolean }
 export type DailyActivityDto = { date: string; count: number }
 export type HistoryEntryDto = { timestamp: number; duration_secs: number; text: string; language: string; engine: string }
 export type LanguageStatDto = { language: string; count: number; average_wpm: number }
@@ -244,6 +301,13 @@ export type LatencyPercentilesDto = { p50_ms: number | null; p95_ms: number | nu
  */
 export type LatencyStatsDto = { recording: LatencyPercentilesDto; inference: LatencyPercentilesDto }
 export type MetricsDto = { sessions: number; words: number; time_saved_minutes: number; average_wpm: number; total_dictation_minutes: number }
+/**
+ * Which permission a Grant button targets — one enum instead of a
+ * stringly-typed `kind: String` (matches `SettingField`'s own established
+ * pattern, D3 from the frontend-rewrite plan). Shared by the onboarding
+ * window's Permissions step and the dashboard's Settings panel.
+ */
+export type PermissionKind = "microphone" | "accessibility" | "screen_recording"
 export type PermissionStatusDto = { mic: string; accessibility: string; system_audio: string }
 /**
  * Selects which boolean field `set_bool_setting` (`lib.rs`) writes — one
