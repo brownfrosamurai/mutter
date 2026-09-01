@@ -89,6 +89,13 @@ async getPermissionStatus() : Promise<PermissionStatusDto> {
  * mic, see `request_mic_access` below). Also the fallback path for mic
  * once its one-shot native prompt (`request_mic_access`) has already been
  * answered, since that prompt won't show again.
+ * 
+ * `async` + `spawn_blocking`, matching `request_mic_access` right below —
+ * a plain sync `#[tauri::command]` runs on the same thread that dispatches
+ * the IPC message (the main/UI thread for the default wry/WKWebView
+ * backend), so `Command::status()`'s blocking wait for `open` to launch
+ * would otherwise stall the UI for however long that takes (review finding,
+ * caught by inconsistency with the sibling command below it).
  */
 async openPermissionSettings(kind: PermissionKind) : Promise<Result<null, string>> {
     try {

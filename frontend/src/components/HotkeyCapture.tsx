@@ -29,7 +29,14 @@ function codeToKeyName(code: string): string | null {
  * bare, unmodified key client-side before ever calling `set_hotkey`,
  * mirroring `hotkey.rs`'s own `parse_shortcut` rejection (the same "a
  * global hotkey needs at least one modifier" incident documented there) —
- * instant feedback instead of a round-trip error. */
+ * instant feedback instead of a round-trip error.
+ *
+ * The keycap button itself is sized to match the design-consultation
+ * preview's compact `.hotkey-keys` badge proportions exactly (5px radius,
+ * tight padding) — same treatment as the read-only keycap badges in
+ * onboarding's Ready step (2026-09-01, user-directed: "use a similar design
+ * as the preview for the hotkeys in settings"), just still a real button
+ * here rather than a static span. */
 export function HotkeyCapture({ title, description, shortcut, onCapture }: HotkeyCaptureProps) {
   const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +93,7 @@ export function HotkeyCapture({ title, description, shortcut, onCapture }: Hotke
             setCapturing(true);
           }}
           disabled={saving}
-          className="rounded-small bg-surface-toggle-track px-3 py-1.5 font-mono text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+          className="rounded-[5px] bg-surface-toggle-track px-2 py-1 font-mono text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
         >
           {capturing ? "Press keys…" : toSymbols(shortcut)}
         </button>

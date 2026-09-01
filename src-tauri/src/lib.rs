@@ -345,8 +345,8 @@ fn complete_onboarding(
     if let Some(win) = app.get_webview_window("onboarding") {
         let _ = win.close();
     }
+    reveal_dashboard(&app);
     if let Some(win) = app.get_webview_window("dashboard") {
-        let _ = win.show();
         let _ = win.set_focus();
     }
     Ok(())
@@ -668,6 +668,34 @@ fn set_pill_vibrancy_layout(window: tauri::WebviewWindow, pill: VibrancyRectDto)
     session::apply_pill_layout(&window, pill.width);
 }
 
+/// Shows the dashboard window — both real call sites (`complete_onboarding`,
+/// the tray's "Open Dashboard") go through this rather than an inline
+/// `.show()`.
+///
+/// **2026-09-01: a native single-shape vibrancy mask (matching the pill's
+/// already-proven `mask_to_shape`) was attempted here, to round the
+/// dashboard window's outer "shell" corners — user-directed, "the shell
+/// should have rounded corners, same as the dashboard." Reverted, not
+/// shipped: live-verified via screenshots and native-side NSLog diagnostics
+/// that the reported rect and the vibrancy view's own bounds matched
+/// exactly (both confirmed 520x400, mask request (0,0,520,400) r=16), yet
+/// the rendered result stayed square at the top and only rounded at the
+/// bottom — and a deliberately wrong, drastically inset test rect (60pt
+/// margin on every side) produced no visible change at all, meaning
+/// `effectView.maskImage` was not visibly affecting the window's actual
+/// rendered vibrancy for this window. Root cause not found (Xcode's view
+/// debugger would be the next real step, not available here). This is the
+/// same fragility class `vibrancy.rs`'s own module docs already warn about
+/// for the dashboard specifically — the two-shape version hit an equally
+/// unresolved wall in 2026-08-31. `windowEffects.radius` remains completely
+/// unusable (blank-window bug, see DESIGN.md). Left as a real open TODO,
+/// not silently dropped.
+fn reveal_dashboard(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("dashboard") {
+        let _ = win.show();
+    }
+}
+
 /// Builds the tauri-specta command registry once, shared by both the real
 /// `invoke_handler` and (debug builds only) the TypeScript export below —
 /// this is the single source of truth for "what commands exist and what do
@@ -926,10 +954,16 @@ pub fn run() {
                         // above and has no working history store behind
                         // it anyway — route back to the recovery screen
                         // instead of trying (and failing) to open it.
-                        let label = if in_recovery { "recovery" } else { "dashboard" };
-                        if let Some(win) = app.get_webview_window(label) {
-                            let _ = win.show();
-                            let _ = win.set_focus();
+                        if in_recovery {
+                            if let Some(win) = app.get_webview_window("recovery") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        } else {
+                            reveal_dashboard(app);
+                            if let Some(win) = app.get_webview_window("dashboard") {
+                                let _ = win.set_focus();
+                            }
                         }
                     }
                 });
