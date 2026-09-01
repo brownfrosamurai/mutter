@@ -150,7 +150,7 @@ export function Pill() {
     "glass-panel",
     PILL_THICK[state] && "glass-panel--thick",
     PILL_TINT[state] && `glass-panel--tint-${PILL_TINT[state]}`,
-    "inline-flex h-9 items-center gap-pill-sm whitespace-nowrap rounded-pill px-pill-md text-text-primary",
+    "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-pill px-4 text-text-primary",
   ]
     .filter(Boolean)
     .join(" ");

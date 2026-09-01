@@ -61,7 +61,7 @@ function HistoryRow({ entry }: { entry: HistoryEntryDto }) {
         type="button"
         aria-label={copied ? "Copied" : "Copy transcript"}
         onClick={() => void handleCopy()}
-        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-small bg-surface-inset text-text-secondary transition-colors duration-fast hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] bg-surface-inset text-text-secondary transition-colors duration-fast hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>

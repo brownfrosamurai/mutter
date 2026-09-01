@@ -44,7 +44,7 @@
   --surface-active: rgba(139, 124, 246, 0.18);
   --surface-filled: rgba(139, 124, 246, 0.55);
   --focus-ring: rgba(139, 124, 246, 0.6);
-  --surface-inset: rgba(255, 255, 255, 0.04);
+  --surface-inset: rgba(255, 255, 255, 0.06);
   --surface-track: rgba(255, 255, 255, 0.08);
   --surface-toggle-track: rgba(255, 255, 255, 0.12);
   --surface-hover: rgba(255, 255, 255, 0.16);
@@ -70,15 +70,14 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  /* Pill-only — deliberately separate from the dashboard's 4px scale (a
-     36px-tall capsule; the 4px scale's coarsest step eats a quarter of
-     that height), and its own hued accent (the dashboard is monochrome,
-     the pill isn't — a real, permanent divergence, not an inconsistency). */
+  /* Pill's own hued accent — the dashboard reads the unified adaptive tint
+     via --surface-active/--surface-filled, the pill reads this directly for
+     its icon/waveform strokes. The pill's own spacing/padding now shares the
+     dashboard's --space-* scale (2026-08-31, mirroring the design-consultation
+     preview exactly — the preview never introduced pill-only spacing values). */
   --accent-violet: #8b7cf6;
   --surface-control: rgba(255, 255, 255, 0.08);
   --surface-control-hover: rgba(255, 255, 255, 0.16);
-  --pill-gap-sm: 6px;
-  --pill-gap-md: 10px;
   --duration-fast: 120ms;
 }
 

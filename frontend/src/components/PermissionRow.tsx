@@ -84,7 +84,7 @@ export function PermissionRow({ kind, status, onGrantAttempted }: PermissionRowP
             type="button"
             onClick={() => void handleGrant()}
             disabled={pending}
-            className="shrink-0 rounded-pill px-3 py-1 text-xs font-medium text-white transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+            className="shrink-0 rounded-pill px-[9px] py-[3px] text-[9px] font-semibold text-white transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
             style={{ backgroundColor: "var(--surface-filled)" }}
           >
             {pending ? "Requesting…" : "Grant"}
@@ -94,14 +94,14 @@ export function PermissionRow({ kind, status, onGrantAttempted }: PermissionRowP
           // treatment) — the green tint token doing real signaling work,
           // not just plain secondary text.
           <span
-            className="shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium"
+            className="shrink-0 rounded-pill px-[7px] py-0.5 text-[9px] font-medium"
             style={{ backgroundColor: "rgba(48, 209, 88, 0.18)", color: "#8FEDB0" }}
           >
             Granted
           </span>
         ) : denied ? (
           <span
-            className="shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium"
+            className="shrink-0 rounded-pill px-[7px] py-0.5 text-[9px] font-medium"
             style={{ backgroundColor: "rgba(255, 69, 58, 0.18)", color: "#FF9D97" }}
           >
             Denied

@@ -36,8 +36,6 @@ export default {
         "4": "var(--space-4)",
         "5": "var(--space-5)",
         "6": "var(--space-6)",
-        "pill-sm": "var(--pill-gap-sm)",
-        "pill-md": "var(--pill-gap-md)",
       },
       borderRadius: {
         pill: "var(--radius-pill)",

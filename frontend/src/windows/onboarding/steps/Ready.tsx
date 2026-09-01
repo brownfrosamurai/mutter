@@ -25,7 +25,7 @@ export function Ready() {
             <Mic size={14} strokeWidth={2} />
             Mic Dictation
           </span>
-          <span className="rounded-small bg-surface-toggle-track px-2 py-1 font-mono text-sm text-text-primary">
+          <span className="rounded-[5px] bg-[rgba(255,255,255,0.08)] px-2 py-1 font-mono text-sm text-text-primary">
             {settings.data ? toSymbols(settings.data.mic_hotkey) : "…"}
           </span>
         </div>
@@ -34,7 +34,7 @@ export function Ready() {
             <Monitor size={14} strokeWidth={2} />
             System Audio
           </span>
-          <span className="rounded-small bg-surface-toggle-track px-2 py-1 font-mono text-sm text-text-primary">
+          <span className="rounded-[5px] bg-[rgba(255,255,255,0.08)] px-2 py-1 font-mono text-sm text-text-primary">
             {settings.data ? toSymbols(settings.data.system_audio_hotkey) : "…"}
           </span>
         </div>
