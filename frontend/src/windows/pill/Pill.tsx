@@ -131,6 +131,11 @@ export function Pill() {
   const showDot = state === "canceling" || state === "done";
   const showText = state !== "listening";
   const dotColor = state === "canceling" ? "var(--danger)" : "var(--success)";
+  // Soft glow halo, matching the design-consultation preview's dot treatment
+  // exactly (0 0 8px at 90% alpha) — a state-colored light source, not just
+  // a flat marker.
+  const dotGlow =
+    state === "canceling" ? "rgba(255, 69, 58, 0.9)" : "rgba(48, 209, 88, 0.9)";
 
   const pillClasses = [
     "glass-panel",
@@ -153,7 +158,7 @@ export function Pill() {
         <span
           aria-hidden="true"
           className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: dotColor }}
+          style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotGlow}` }}
         />
       )}
 

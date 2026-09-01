@@ -39,7 +39,7 @@ export function Onboarding() {
           {STEPS.map((s, i) => (
             <div
               key={s}
-              className="h-1.5 w-1.5 rounded-full transition-colors duration-base ease-standard"
+              className="h-[5px] w-[5px] rounded-full transition-colors duration-base ease-standard"
               style={{
                 backgroundColor: i <= stepIndex ? "var(--surface-filled)" : "var(--surface-track)",
               }}

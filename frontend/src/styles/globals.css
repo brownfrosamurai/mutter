@@ -185,7 +185,7 @@ body {
 
 .glass-panel--tint-violet {
   --tint: var(--tint-violet);
-  --tint-strength: 0.5;
+  --tint-strength: 0.55;
 }
 .glass-panel--tint-red {
   --tint: var(--tint-red);

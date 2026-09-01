@@ -71,6 +71,7 @@ export function PermissionRow({ kind, status, onGrantAttempted }: PermissionRowP
   }
 
   const granted = status === "granted";
+  const denied = status === "denied";
   const unavailable = status === "unavailable";
   const canGrant = !granted && !unavailable;
 
@@ -87,6 +88,23 @@ export function PermissionRow({ kind, status, onGrantAttempted }: PermissionRowP
           >
             {pending ? "Requesting…" : "Grant"}
           </button>
+        ) : granted ? (
+          // Tinted status pill (design-consultation preview's "status-pill"
+          // treatment) — the green tint token doing real signaling work,
+          // not just plain secondary text.
+          <span
+            className="shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium"
+            style={{ backgroundColor: "rgba(48, 209, 88, 0.18)", color: "#8FEDB0" }}
+          >
+            Granted
+          </span>
+        ) : denied ? (
+          <span
+            className="shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium"
+            style={{ backgroundColor: "rgba(255, 69, 58, 0.18)", color: "#FF9D97" }}
+          >
+            Denied
+          </span>
         ) : (
           <span className="text-xs text-text-secondary">
             {status ? (STATUS_LABEL[status] ?? status) : "Checking…"}
