@@ -85,8 +85,25 @@ Transition both on the same `--duration-base`/`--ease-standard` the resize itsel
 | `--tint-red` | `255, 69, 58` | Canceling / destructive — pill cancel countdown **and** dashboard Quit button |
 | `--tint-green` | `48, 209, 88` | Done / success — pill confirmation **and** dashboard success confirmations |
 | `--tint-neutral` | `255, 255, 255` | Idle — no state, `--tint-strength: 0` |
-| `--tint-strength` (active) | `0.5–0.55` on the pill (foreground surface, tint can read clearly) | |
-| `--tint-strength` (active) | `0.16` on the dashboard (background surface — tint should be a hint, not a wash, in a denser UI) | |
+| `--tint-strength` (`--tint-violet`) | `0.55` | Set by `.glass-panel--tint-violet` |
+| `--tint-strength` (`--tint-red` / `--tint-green`) | `0.5` | Set by `.glass-panel--tint-red` / `--tint-green` |
+| `--tint-strength` (`--surface-active`, dashboard selection wash) | `0.18` | Not the pseudo-element mechanism above — see "Surface / neutral tokens" below |
+
+## Surface / neutral tokens
+
+The small solid-fill elements (nav-icon selection, toggle tracks, activity/language bar fills, inset boxes) don't run the full lensing/tint pseudo-element mechanism — that's reserved for real glass panels with their own backdrop-filter. These are flat `background-color` fills reading the same two tint values so retinting them is one token change, not a per-component rewrite:
+
+| Token | Value | Use |
+|---|---|---|
+| `--surface-active` | `rgba(139, 124, 246, 0.18)` | Sidebar's active nav-icon background |
+| `--surface-filled` | `rgba(139, 124, 246, 0.55)` | Toggle's on-track, activity chart's active-day bar, language bar's fill, onboarding's active progress dot, PermissionRow's Grant button and Onboarding/Continue CTA fill |
+| `--surface-inset` | `rgba(255, 255, 255, 0.06)` | Recessed boxes — search input, HotkeyCapture's card, onboarding's Ready-step hotkey rows, History's copy button |
+| `--surface-track` | `rgba(255, 255, 255, 0.08)` | Empty/inactive bar track (activity chart, language bar) |
+| `--surface-toggle-track` | `rgba(255, 255, 255, 0.12)` | Toggle's off-track, HotkeyCapture's click-to-capture button |
+| `--surface-hover` | `rgba(255, 255, 255, 0.16)` | Hover fill on secondary buttons/rows |
+| `--focus-ring` | `rgba(139, 124, 246, 0.6)` | Every `:focus-visible` ring, both surfaces |
+
+**No box borders on recessed elements** — matching the design-consultation preview's consistent treatment (rely on the ancestor `.glass-panel`'s own lensing rim for edge definition, not a second border on nested controls). Search inputs, hotkey rows/cards, and the onboarding Permissions-step wrapper all dropped their `border-glass-border` for this reason (2026-09-01). `--glass-border` itself is unchanged and still used for row-divider hairlines (`border-b`) — that's a different concept (separating stacked rows) from a box outline around one control.
 
 ## Color
 
@@ -116,6 +133,7 @@ font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
+  font-size: 17px;
 }
 ```
 
@@ -127,9 +145,11 @@ Used only for the dashboard's four stat-tile numbers (sessions/words/WPM/time-sa
 | `--text-sm` | 12px | 400 | Body text, settings labels |
 | `--text-base` | 13px | 500 | Pill status text, primary dashboard labels |
 | `--text-lg` | 15px | 600 | Dashboard panel title |
-| stat-value (rounded) | 18px | 650 | The four Metrics stat tiles only |
+| stat-value (rounded) | 17px | 650 | The Metrics stat tiles only |
 
 Unchanged from the prior system — this scale was already right for the app's size and doesn't need relitigating.
+
+**A handful of small controls use one-off arbitrary sizes slightly outside this scale** — PermissionRow's Granted/Denied pills and Grant button (9px text, 7–9px padding), History's copy button (20px, 6px radius), onboarding's keycap badges (5px radius). These match the design-consultation preview's own computed values exactly, verified via `getComputedStyle()` against the preview HTML rather than eyeballed — see each component's own code comment for the specific value, not duplicated here since they're genuinely one-off, not a new scale step.
 
 ## Shape & concentricity
 
@@ -163,9 +183,10 @@ Still subtle and fast — this is a widget, not a marketing site. The one new ru
 
 **Unchanged from the prior system, deliberately — flagged, not silently kept.** The sidebar-pill + content-card dashboard shell and the single-row pill capsule are both real, live-verified, backed by non-trivial native code (the two-shape vibrancy mask, `mask_to_shapes`, the corner-radius shims documented in git history). This redesign is about material, color, and motion — rewriting the window skeleton on top of that would discard working native engineering for no demonstrated visual gain. Revisit only if a specific problem with the current skeleton shows up.
 
-- **Pill:** single row, icon-left, status-text-right. No settings, no branding, no chrome.
-- **Dashboard:** floating icon sidebar (not top-tabs), vertically centered next to a full-height content card. Sidebar stays sized to its own content, not stretched — a short floating capsule, not a conventional full-height app rail.
+- **Pill:** single row, icon-left, status-text-right. No settings, no branding, no chrome. Every active state (`listening`/`canceling`/`done`) reads through one consistent status-dot + glow language now (2026-09-01) — the mic-icon SVG that used to be `listening`'s own one-off indicator is gone, replaced by the same violet dot the other two states already used in red/green. Horizontal padding/internal gap now read the shared `--space-4`/`--space-2` tokens directly, not pill-only spacing values (the old `--pill-gap-sm`/`--pill-gap-md` tokens are removed).
+- **Dashboard:** floating icon sidebar (not top-tabs), vertically centered next to a full-height content card. Sidebar stays sized to its own content, not stretched — a short floating capsule, not a conventional full-height app rail. Sidebar width is `40px` (nav icons `26px`, `--radius-small` corners — **squarish chips, not circles**, matching the design-consultation preview's `.nav-icon` exactly). The sidebar rail itself stays `--radius-pill` (a real, deliberate divergence from the preview's own computed 16px — see Sidebar.tsx's code comment: the preview's `.dash-sidebar` never overrides `.glass`'s default radius, a real gap in that file rather than an intended design, and a 40px-wide rail at 16px corners reads as a squared card, not the floating capsule this app's identity depends on). No decorative brand mark above the nav icons anymore (removed 2026-09-01, user-directed) — nav icons only.
 - **No dock icon, no permanent window.** Both surfaces exist only when summoned.
+- **Settings panel section order:** Permissions → Hotkey → Output → Updates (2026-09-01). Hotkey configuration (click-to-capture, `HotkeyCapture`) is now an always-visible section, promoted out of a collapsed "Advanced" disclosure — the design-consultation preview shows it as first-class, not a hidden power-user detail. Still click-to-capture, not a typed-string-plus-Save field: that interaction was deliberately replaced pre-redesign for a real, tested UX reason (see `HotkeyCapture.tsx`'s own module doc), and the preview's simpler static mock isn't grounds to regress it.
 
 ## Implementation notes (native rendering, unchanged mechanism)
 
@@ -180,3 +201,9 @@ The actual frosted-glass effect requires real macOS `NSVisualEffectView` vibranc
 | 2026-08-31 | `ui-rounded` (SF Pro Rounded) added for dashboard stat numerals only | Matches Apple's own use of rounded numerals for glanceable data (Weather, Fitness widgets); zero cost via native WKWebView font resolution |
 | 2026-08-31 | Dashboard/pill window skeleton kept as-is | Real native vibrancy-masking engineering already invested and live-verified; redesign scoped to material/color/motion, not window architecture |
 | 2026-08-31 | Squircle corner-radius left as a flagged follow-up, not implemented | Needs a parametric path-generation helper tied to the existing vibrancy-layout reporting mechanism; out of scope for a design-tokens pass |
+| 2026-09-01 | Sidebar decorative wave-mark icon removed entirely | User-directed; the preview's sidebar is nav icons only |
+| 2026-09-01 | Pill unified to one status-dot language across listening/canceling/done, replacing listening's one-off mic-icon SVG | User-directed literal preview match; closes a real inconsistency (only one of three states had its own icon) |
+| 2026-09-01 | Toggle resized to 34×19px track / 15px thumb, border removed; Settings/onboarding recessed boxes lost their box borders app-wide | User-directed literal preview match — preview relies on the ancestor glass panel's lensing rim for edge definition, not per-control borders |
+| 2026-09-01 | Settings panel restructured: Hotkey promoted out of collapsed "Advanced" into an always-visible section; order becomes Permissions → Hotkey → Output → Updates | Preview shows hotkey config as first-class, not hidden; click-to-capture interaction itself preserved (not regressed to a text-input+Save field) |
+| 2026-09-01 | PermissionRow's Grant button restyled to a solid violet rounded-pill; Granted/Denied became tinted status pills | Preview's `.grant-btn`/`.status-pill` treatment — the green/red tint tokens weren't doing any real signaling work before this |
+| 2026-09-01 | `--surface-inset` bumped 0.04 → 0.06; pill-only spacing tokens (`--pill-gap-sm/md`) retired in favor of the shared `--space-2`/`--space-4` scale; several small controls (status pills, Grant button, History's copy button, onboarding keycaps) sized to one-off values; sidebar nav icons changed from circles to `--radius-small` chips | Found via direct `getComputedStyle()` diffing of the preview HTML against the shipped app (`/design-review`), not visual inspection — see PR/commit for the full value-by-value list |
