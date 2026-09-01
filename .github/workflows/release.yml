@@ -23,6 +23,12 @@ on:
 jobs:
   release:
     runs-on: macos-latest
+    # GITHUB_TOKEN defaults to read-only contents access on repos with the
+    # "Read repository contents" default workflow-permissions setting —
+    # tauri-action's release-creation call fails with "Resource not
+    # accessible by integration" without this explicit grant.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
