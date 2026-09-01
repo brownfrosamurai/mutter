@@ -18,7 +18,7 @@ export function Permissions() {
         audio for meeting transcription. You can grant these later in Settings if you'd rather
         skip for now.
       </p>
-      <div className="mt-4 rounded-small border border-glass-border bg-surface-inset px-3">
+      <div className="mt-4">
         {KINDS.map((kind) => (
           <PermissionRow
             key={kind}

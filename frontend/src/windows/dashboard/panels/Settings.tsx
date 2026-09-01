@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { commands, type SettingField } from "@/lib/bindings";
@@ -164,7 +163,6 @@ function UpdateRow() {
 
 export function SettingsPanel() {
   const queryClient = useQueryClient();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const settings = useQuery({
     queryKey: ["settings"],
@@ -201,29 +199,6 @@ export function SettingsPanel() {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Output</h2>
-        <div>
-          {OUTPUT_TOGGLES.map(({ field, title, description }) => (
-            <SettingRow
-              key={field}
-              title={title}
-              description={description}
-              checked={settings.data ? Boolean(settings.data[fieldToSnakeCase(field) as keyof typeof settings.data]) : true}
-              onCheckedChange={(checked) => void handleToggle(field, checked)}
-              disabled={!settings.data}
-            />
-          ))}
-          <SettingRow
-            title="AI grammar cleanup"
-            description="Runs a small local model on every transcript for real grammar/word-choice correction, on top of the always-on punctuation cleanup. Off by default: downloads a ~390MB model on first use, adds latency to every dictation, and may occasionally reword precise technical terms — worth leaving off while dictating to an AI coding agent."
-            checked={settings.data?.grammar_llm_cleanup_enabled ?? false}
-            onCheckedChange={(checked) => void handleGrammarLlmToggle(checked)}
-            disabled={!settings.data}
-          />
-        </div>
-      </section>
-
-      <section>
         <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Permissions</h2>
         <div>
           {(["mic", "accessibility", "system_audio"] as const satisfies readonly PermissionRowKind[]).map(
@@ -245,23 +220,16 @@ export function SettingsPanel() {
         </div>
       </section>
 
+      {/* Promoted out of a collapsed "Advanced" disclosure — the preview
+          shows hotkey configuration as a first-class, always-visible
+          section, not a hidden power-user detail. Still click-to-capture
+          (HotkeyCapture), not a typed-string + Save field — that flow was
+          deliberately replaced pre-redesign for a real, tested UX reason
+          documented in HotkeyCapture's own module doc; the preview's
+          simpler text-input mock isn't a good enough reason to regress it. */}
       <section>
-        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Updates</h2>
-        <div>
-          <UpdateRow />
-        </div>
-      </section>
-
-      <section>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((o) => !o)}
-          className="flex items-center gap-1 text-xs uppercase tracking-wide text-text-secondary"
-        >
-          {advancedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Advanced
-        </button>
-        {advancedOpen && settings.data && (
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Hotkey</h2>
+        {settings.data && (
           <div className="mt-3 grid grid-cols-2 gap-3">
             <HotkeyCapture
               title="Mic Dictation"
@@ -285,6 +253,36 @@ export function SettingsPanel() {
             />
           </div>
         )}
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Output</h2>
+        <div>
+          {OUTPUT_TOGGLES.map(({ field, title, description }) => (
+            <SettingRow
+              key={field}
+              title={title}
+              description={description}
+              checked={settings.data ? Boolean(settings.data[fieldToSnakeCase(field) as keyof typeof settings.data]) : true}
+              onCheckedChange={(checked) => void handleToggle(field, checked)}
+              disabled={!settings.data}
+            />
+          ))}
+          <SettingRow
+            title="AI grammar cleanup"
+            description="Runs a small local model on every transcript for real grammar/word-choice correction, on top of the always-on punctuation cleanup. Off by default: downloads a ~390MB model on first use, adds latency to every dictation, and may occasionally reword precise technical terms — worth leaving off while dictating to an AI coding agent."
+            checked={settings.data?.grammar_llm_cleanup_enabled ?? false}
+            onCheckedChange={(checked) => void handleGrammarLlmToggle(checked)}
+            disabled={!settings.data}
+          />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">Updates</h2>
+        <div>
+          <UpdateRow />
+        </div>
       </section>
     </div>
   );

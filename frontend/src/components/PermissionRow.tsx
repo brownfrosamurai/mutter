@@ -84,7 +84,8 @@ export function PermissionRow({ kind, status, onGrantAttempted }: PermissionRowP
             type="button"
             onClick={() => void handleGrant()}
             disabled={pending}
-            className="shrink-0 rounded-small border border-glass-border bg-surface-toggle-track px-3 py-1 text-xs text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+            className="shrink-0 rounded-pill px-3 py-1 text-xs font-medium text-white transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+            style={{ backgroundColor: "var(--surface-filled)" }}
           >
             {pending ? "Requesting…" : "Grant"}
           </button>

@@ -73,7 +73,7 @@ export function HotkeyCapture({ title, description, shortcut, onCapture }: Hotke
   }, [capturing, onCapture]);
 
   return (
-    <div className="rounded-small border border-glass-border bg-surface-inset p-3">
+    <div className="rounded-small bg-surface-inset p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-text-primary">{title}</div>
@@ -86,7 +86,7 @@ export function HotkeyCapture({ title, description, shortcut, onCapture }: Hotke
             setCapturing(true);
           }}
           disabled={saving}
-          className="rounded-small border border-glass-border bg-surface-toggle-track px-3 py-1.5 font-mono text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+          className="rounded-small bg-surface-toggle-track px-3 py-1.5 font-mono text-sm text-text-primary transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
         >
           {capturing ? "Press keys…" : toSymbols(shortcut)}
         </button>

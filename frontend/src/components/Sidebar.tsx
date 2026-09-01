@@ -1,10 +1,4 @@
-import {
-  AudioWaveform,
-  BarChart3,
-  History,
-  Settings,
-  Power,
-} from "lucide-react";
+import { BarChart3, History, Settings, Power } from "lucide-react";
 import { GlassPanel } from "./GlassPanel";
 
 export type PanelId = "stats" | "history" | "settings";
@@ -23,23 +17,12 @@ const NAV_ITEMS: { id: PanelId; label: string; icon: typeof BarChart3 }[] = [
 
 /** Floating icon nav rail — content-sized pill capsule, vertically centered
  * (DESIGN.md's "widget, not a huge desktop application" layout principle).
- * The top wave icon is a decorative brand mark (confirmed with the user,
- * not a 4th nav destination) — not a button, no click handler. Always shown
- * in the same highlighted state a selected nav icon gets (2026-08-31,
- * user-directed) — a permanent mark, not a selection state. Its own
- * independent `.glass-panel`, frosted separately from the main content
- * card via the window's uniform native vibrancy underneath both. */
+ * The decorative wave-mark brand icon that used to sit above the nav items
+ * is gone (2026-08-31, user-directed removal) — the preview's sidebar is
+ * nav icons only, no separate static brand mark. */
 export function Sidebar({ active, onSelect, onQuit }: SidebarProps) {
   return (
     <GlassPanel className="flex w-10 flex-col items-center gap-1 self-center rounded-pill py-2">
-      <div
-        aria-hidden="true"
-        className="mb-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-text-primary"
-        style={{ backgroundColor: "var(--surface-active)" }}
-      >
-        <AudioWaveform size={16} strokeWidth={2} />
-      </div>
-
       {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
         <button
           key={id}

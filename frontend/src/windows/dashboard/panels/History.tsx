@@ -48,20 +48,20 @@ function HistoryRow({ entry }: { entry: HistoryEntryDto }) {
           {entry.text}
         </p>
         <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary">
-          <span>{formatDuration(entry.duration_secs)}</span>
+          <span>{formatRelativeTime(entry.timestamp)}</span>
           <span aria-hidden="true">·</span>
           <span>{languageName(entry.language)}</span>
           <span aria-hidden="true">·</span>
-          <span>{entry.text.split(/\s+/).filter(Boolean).length} words</span>
+          <span>{formatDuration(entry.duration_secs)}</span>
           <span aria-hidden="true">·</span>
-          <span>{formatRelativeTime(entry.timestamp)}</span>
+          <span>{entry.text.split(/\s+/).filter(Boolean).length} words</span>
         </div>
       </div>
       <button
         type="button"
         aria-label={copied ? "Copied" : "Copy transcript"}
         onClick={() => void handleCopy()}
-        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors duration-fast hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-small bg-surface-inset text-text-secondary transition-colors duration-fast hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
@@ -100,7 +100,7 @@ export function HistoryPanel() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search recent transcripts…"
-          className="w-full rounded-small border border-glass-border bg-surface-inset py-2 pl-8 pr-3 text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="w-full rounded-small bg-surface-inset py-2 pl-8 pr-3 text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         />
       </div>
 
