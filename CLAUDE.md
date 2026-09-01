@@ -6,7 +6,7 @@ Local-first, multi-language speech-to-text dictation app with a second system-au
 
 **Original spec:** `docs/mutter-idea-dump.md` — the user's own freeform requirements. Source of truth for scope.
 
-**Design system:** `DESIGN.md` — glassmorphic UI tokens (colors, typography, spacing, motion) for the pill HUD and dashboard.
+**Design system:** `DESIGN.md` — **rewritten 2026-08-31, user-directed (`/design-consultation`)**: Apple Liquid Glass-derived UI tokens (lensing, morph, adaptive tint, concentricity, typography, spacing, motion) for the pill HUD and dashboard, replacing the prior flat-glassmorphism system. Always read DESIGN.md before making any visual or UI decision; don't deviate without explicit user approval. The window skeleton (sidebar-pill + card, single-row pill) and native vibrancy-masking mechanism are unchanged — only the material/color/motion layer on top was redesigned.
 
 ## Hard constraints (do not violate)
 
