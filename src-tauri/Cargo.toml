@@ -89,8 +89,16 @@ core-foundation-sys = "0.8"
 core-graphics = "0.25.0" # synthetic Cmd+V via CGEvent
 objc2 = { version = "0.6", default-features = false, features = ["std"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["alloc", "NSString"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard"] } # NSPasteboard
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSView"] } # NSPasteboard, NSView (dashboard liquid-glass content_view reparenting)
 tracing-appender = "0.2"
+
+# Real NSGlassEffectView-backed corner radius on macOS 26+ (dashboard's
+# "shell" — see lib.rs's `apply_dashboard_glass` doc comment for the full
+# story: the prior NSVisualEffectView.maskImage approach was live-verified
+# broken — root cause found via research, not just abandoned — and this
+# is the actual documented fix, not another guess). 0.8 is the first
+# version with `apply_liquid_glass`/`content_view` reparenting.
+window-vibrancy = "0.8"
 
 # Auto-generates TypeScript types + typed invoke() wrappers directly from the
 # #[tauri::command] definitions below (frontend/src/lib/bindings.ts) — see

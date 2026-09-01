@@ -22,6 +22,11 @@ use tauri::Manager;
 /// (`ModelTier::Small`/`Medium`, engine::whisper) — just which engine.
 const DEFAULT_ENGINE_NAME: &str = "whisper-small";
 
+/// Same value as `--radius-panel` in `globals.css` — the dashboard window's
+/// outer "shell" gets real native corner rounding to match, via
+/// `vibrancy::apply_dashboard_glass`.
+const DASHBOARD_SHELL_RADIUS: f64 = 16.0;
+
 /// Manual equivalent of pressing the global Escape hotkey — the pill's
 /// cancel button (`#pill-cancel`) invokes this, since a webview button click
 /// can't itself register as a global-shortcut key-press.
@@ -672,24 +677,20 @@ fn set_pill_vibrancy_layout(window: tauri::WebviewWindow, pill: VibrancyRectDto)
 /// the tray's "Open Dashboard") go through this rather than an inline
 /// `.show()`.
 ///
-/// **2026-09-01: a native single-shape vibrancy mask (matching the pill's
-/// already-proven `mask_to_shape`) was attempted here, to round the
-/// dashboard window's outer "shell" corners — user-directed, "the shell
-/// should have rounded corners, same as the dashboard." Reverted, not
-/// shipped: live-verified via screenshots and native-side NSLog diagnostics
-/// that the reported rect and the vibrancy view's own bounds matched
-/// exactly (both confirmed 520x400, mask request (0,0,520,400) r=16), yet
-/// the rendered result stayed square at the top and only rounded at the
-/// bottom — and a deliberately wrong, drastically inset test rect (60pt
-/// margin on every side) produced no visible change at all, meaning
-/// `effectView.maskImage` was not visibly affecting the window's actual
-/// rendered vibrancy for this window. Root cause not found (Xcode's view
-/// debugger would be the next real step, not available here). This is the
-/// same fragility class `vibrancy.rs`'s own module docs already warn about
-/// for the dashboard specifically — the two-shape version hit an equally
-/// unresolved wall in 2026-08-31. `windowEffects.radius` remains completely
-/// unusable (blank-window bug, see DESIGN.md). Left as a real open TODO,
-/// not silently dropped.
+/// **The shell's square corners are fixed for real now** — see
+/// `vibrancy::apply_dashboard_glass` (applied once at startup, in `setup()`
+/// below, not here — it doesn't need reapplying on every show the way the
+/// old per-resize masking attempt did). A first attempt at this (2026-09-01,
+/// single-shape `maskImage` masking, matching the pill's approach) was
+/// tried and reverted the same day — live-verified broken via screenshots
+/// and native NSLog diagnostics despite mathematically-correct inputs. The
+/// real root cause was found afterward through actual research (not another
+/// guess): `NSVisualEffectView.maskImage` only reliably masks when the
+/// effect view *is* the window's content view, not a subview alongside a
+/// WKWebView sibling. `window-vibrancy` 0.8's `apply_liquid_glass` (real
+/// macOS 26+ `NSGlassEffectView`) fixes this at the source via its
+/// `content_view` reparenting option, with a flat-vibrancy fallback for
+/// macOS < 26.
 fn reveal_dashboard(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("dashboard") {
         let _ = win.show();
@@ -874,6 +875,17 @@ pub fn run() {
             app.manage(GrammarLlmCleanupFlag(grammar_llm_cleanup_enabled));
             app.manage(live_toggle_flags);
             app.manage(Mutex::new(app_settings));
+
+            // Real rounded-corner "shell" material (macOS 26+ Liquid Glass,
+            // flat vibrancy fallback below that) — see vibrancy.rs's
+            // `apply_dashboard_glass` for the full story. Once, here: unlike
+            // the reverted per-resize masking attempt, this doesn't need
+            // re-applying on layout changes, and doesn't depend on the
+            // window's visibility (it's still correct whenever the window is
+            // later shown, hidden or not right now).
+            if let Some(win) = app.get_webview_window("dashboard") {
+                vibrancy::apply_dashboard_glass(&win, DASHBOARD_SHELL_RADIUS);
+            }
 
             // The dashboard window is meant to persist for the app's whole
             // lifetime and be shown/hidden (via the tray's "Open Dashboard"

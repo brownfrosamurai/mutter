@@ -42,6 +42,17 @@
 //! public, documented API Apple ships for exactly this
 //! (`NSVisualEffectView.maskImage`).
 //!
+//! **2026-09-01: the dashboard's shell got real, working corner rounding —
+//! see `apply_dashboard_glass` below.** Not another maskImage attempt: real
+//! research (not guessing) found the actual root cause of the failures
+//! above — `NSVisualEffectView.maskImage` only reliably masks when the
+//! effect view *is* the window's content view, not a subview alongside a
+//! WKWebView sibling — and the actual fix, `window-vibrancy` 0.8's
+//! `apply_liquid_glass` (Apple's real macOS 26+ `NSGlassEffectView`, with a
+//! `content_view` option that reparents the WebView into the glass view
+//! instead of leaving it a sibling). Falls back to the same flat vibrancy
+//! this module used to apply nothing in place of, on macOS < 26.
+//!
 //! The layout itself (where a window's real UI actually sits) is reported
 //! live by the frontend — via `getBoundingClientRect()`, on load and
 //! whenever it changes — rather than hardcoded here from CSS constants, so
@@ -165,4 +176,86 @@ pub fn mask_to_shapes<R: tauri::Runtime>(
 /// pill, which has no second floating element to mask separately.
 pub fn mask_to_shape<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, shape: Shape) -> bool {
     mask_to_shapes(window, shape, ZERO_SHAPE)
+}
+
+/// The dashboard's outer "shell" — real `NSGlassEffectView` corner rounding
+/// on macOS 26+ (Tahoe's actual native Liquid Glass material, applied via
+/// `window-vibrancy`'s `apply_liquid_glass`), falling back to the same flat
+/// `NSVisualEffectView` vibrancy the window used to get declaratively via
+/// `windowEffects` in `tauri.conf.json` on older macOS.
+///
+/// **Replaces the maskImage-based masking attempt (2026-09-01, reverted the
+/// same day it was tried).** That attempt live-verified the reported mask
+/// rect and the vibrancy view's own bounds matched exactly, yet the render
+/// stayed square regardless — root-caused afterward via actual research,
+/// not just abandoned again: `NSVisualEffectView.maskImage` only reliably
+/// masks when the effect view *is* the window's content view, not when it's
+/// a subview sitting alongside a WKWebView sibling (this app's exact setup,
+/// same as every window here). `apply_liquid_glass`'s `content_view` option
+/// fixes this at the actual source, not around it — it reparents the
+/// WebView *into* the glass view instead of leaving it a sibling, so there's
+/// no compositing-order mismatch left to fight. `NSGlassEffectView` also
+/// exposes a real, public, first-class `cornerRadius` — no private
+/// selector, no hand-built CoreGraphics bitmap mask.
+///
+/// Called once, at startup — unlike the old per-resize `mask_to_shape`
+/// approach, `NSGlassEffectView.cornerRadius` is a real CALayer-backed
+/// property that tracks the view's own frame automatically on resize;
+/// there's nothing to re-report on every layout change.
+pub fn apply_dashboard_glass<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, radius: f64) {
+    let window_for_webview = window.clone();
+    let result = window.with_webview(move |platform_webview| {
+        apply_dashboard_glass_to_webview(&window_for_webview, platform_webview, radius);
+    });
+    if let Err(e) = result {
+        tracing::warn!(error = %e, "apply_dashboard_glass: with_webview failed");
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn apply_dashboard_glass_to_webview<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+    platform_webview: tauri::webview::PlatformWebview,
+    radius: f64,
+) {
+    use objc2_app_kit::NSView;
+
+    let webview_ptr = platform_webview.inner();
+    let webview_ns_view = unsafe { (webview_ptr as *mut NSView).as_ref() };
+    let Some(webview_ns_view) = webview_ns_view else {
+        tracing::warn!("apply_dashboard_glass: webview ns_view was null");
+        return;
+    };
+
+    let options =
+        window_vibrancy::LiquidGlassOptions::new(window_vibrancy::NSGlassEffectViewStyle::Regular)
+            .radius(radius)
+            .content_view(webview_ns_view);
+
+    match window_vibrancy::apply_liquid_glass(window, options) {
+        Ok(()) => {
+            tracing::info!(radius, "dashboard: real Liquid Glass applied (macOS 26+)");
+        }
+        Err(e) => {
+            // Covers both UnsupportedPlatformVersion (< macOS 26 — the
+            // expected, common case for now) and any other real failure —
+            // either way, the flat vibrancy fallback is strictly better
+            // than a window with no material applied at all.
+            tracing::info!(error = %e, "dashboard: Liquid Glass unavailable, applying flat vibrancy fallback");
+            let _ = window_vibrancy::apply_vibrancy(
+                window,
+                window_vibrancy::NSVisualEffectMaterial::HudWindow,
+                Some(window_vibrancy::NSVisualEffectState::Active),
+                None,
+            );
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn apply_dashboard_glass_to_webview<R: tauri::Runtime>(
+    _window: &tauri::WebviewWindow<R>,
+    _platform_webview: tauri::webview::PlatformWebview,
+    _radius: f64,
+) {
 }
