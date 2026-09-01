@@ -65,6 +65,18 @@ export default {
           "SF Pro Display",
           "sans-serif",
         ],
+        // ui-rounded resolves to real SF Pro Rounded in WKWebView (Tauri's
+        // rendering engine) — zero bundle cost, not a web font. Used only
+        // for glanceable numeric displays (dashboard stat tiles), matching
+        // Apple's own use of rounded numerals in Weather/Fitness widgets —
+        // see DESIGN.md's Typography section.
+        rounded: [
+          "ui-rounded",
+          "SF Pro Rounded",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "sans-serif",
+        ],
       },
     },
   },

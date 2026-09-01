@@ -28,6 +28,26 @@ const STATUS_TEXT: Record<PillStateName, string> = {
   done: "Done",
 };
 
+// Liquid Glass morph/tint per state (DESIGN.md's "Material system" —
+// unifies the pill's palette with the dashboard's instead of the two
+// surfaces running separate color philosophies). `loading` and `listening`
+// are the pill's wide states (two lines of text; waveform + timer +
+// controls) so they morph "thick"; `canceling` also runs wide (countdown
+// numeral); `done` is narrow, so it stays "thin" — deeper shadow/blur is
+// reserved for the states that are actually visually larger.
+const PILL_TINT: Record<PillStateName, "violet" | "red" | "green" | undefined> = {
+  loading: undefined,
+  listening: "violet",
+  canceling: "red",
+  done: "green",
+};
+const PILL_THICK: Record<PillStateName, boolean> = {
+  loading: true,
+  listening: true,
+  canceling: true,
+  done: false,
+};
+
 const WAVEFORM_BAR_COUNT = 5;
 // Static fallback heights for prefers-reduced-motion — still reads as a
 // waveform shape, just frozen, not flat bars (see the pre-rewrite pill's
@@ -112,13 +132,22 @@ export function Pill() {
   const showText = state !== "listening";
   const dotColor = state === "canceling" ? "var(--danger)" : "var(--success)";
 
+  const pillClasses = [
+    "glass-panel",
+    PILL_THICK[state] && "glass-panel--thick",
+    PILL_TINT[state] && `glass-panel--tint-${PILL_TINT[state]}`,
+    "inline-flex h-9 items-center gap-pill-sm whitespace-nowrap rounded-pill px-pill-md text-text-primary",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
       ref={pillRef}
       id="pill"
       data-tauri-drag-region
       data-state={state}
-      className="glass-panel inline-flex h-9 items-center gap-pill-sm whitespace-nowrap rounded-pill px-pill-md text-text-primary"
+      className={pillClasses}
     >
       {showDot && (
         <span

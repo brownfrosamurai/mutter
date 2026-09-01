@@ -35,7 +35,7 @@ export function App() {
         }}
       />
 
-      <GlassPanel className="relative flex-1 overflow-hidden rounded-panel">
+      <GlassPanel thick className="relative flex-1 overflow-hidden rounded-panel">
         <div
           data-tauri-drag-region
           className="absolute inset-x-0 top-0 z-10 flex h-11 items-center justify-between px-4"

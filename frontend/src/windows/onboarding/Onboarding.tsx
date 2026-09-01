@@ -34,7 +34,7 @@ export function Onboarding() {
 
   return (
     <div className="flex h-screen items-center justify-center p-4">
-      <GlassPanel className="flex w-full max-w-md flex-col rounded-panel p-6">
+      <GlassPanel thick className="flex w-full max-w-md flex-col rounded-panel p-6">
         <div className="mb-5 flex items-center justify-center gap-1.5" aria-hidden="true">
           {STEPS.map((s, i) => (
             <div
@@ -80,7 +80,7 @@ export function Onboarding() {
               type="button"
               onClick={() => (isLastStep ? void finish() : setStepIndex((i) => i + 1))}
               disabled={finishing}
-              className="rounded-small bg-surface-filled px-4 py-1.5 text-sm font-medium text-black transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+              className="rounded-small bg-surface-filled px-4 py-1.5 text-sm font-medium text-white transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
             >
               {isLastStep ? (finishing ? "Opening…" : "Open Dashboard") : "Continue"}
             </button>

@@ -2,17 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens — carried over from the pre-React DESIGN.md token system.
-   Exact color-grade matching happens in the Phase D design-polish pass
-   (/frontend-design, /impeccable); this is the best-effort starting point. */
+/* Design tokens — rewritten 2026-08-31 for DESIGN.md's Liquid Glass pass
+   (Apple's macOS Tahoe / WWDC25 design language, replacing the prior flat
+   glassmorphism). Material mechanics (lensing, morph, adaptive tint) live
+   in `.glass-panel` below. Component-level tint (nav selection, toggle-on,
+   activity/language bar fill) rides on the same two tokens those
+   components already consumed pre-rewrite — only the *values* changed,
+   which is what unifies the pill's and dashboard's palettes without
+   touching those components' call sites. */
 :root {
-  /* The frost's own tint — dark, on top of whatever native vibrancy is
-     showing through underneath (pill/dashboard/recovery all set
-     windowEffects: hudWindow). Moderate alpha, not opaque: the point is a
-     dark pane of glass, not a solid card. */
-  --glass-bg: rgba(10, 10, 12, 0.55);
+  /* Base glass fill — cooler/more neutral, lower-opacity than the prior
+     rgba(10,10,12,0.55) so lensing/tint actually read, still well above
+     the transparency level that made macOS Tahoe's own menu bar criticized
+     as illegible (see DESIGN.md's Color section). */
+  --glass-bg: rgba(22, 22, 24, 0.72);
+  --glass-bg-thick: rgba(22, 22, 24, 0.8);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
   --text-primary: rgba(255, 255, 255, 0.94);
   --text-secondary: rgba(255, 255, 255, 0.48);
   --danger: #ff453a;
@@ -22,16 +27,33 @@
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --duration-base: 200ms;
 
-  /* Dashboard-only (monochrome accent system — see DESIGN.md) */
-  --surface-active: rgba(255, 255, 255, 0.18);
-  --surface-filled: rgba(255, 255, 255, 0.55);
-  --focus-ring: rgba(255, 255, 255, 0.5);
+  /* Adaptive tint — one system, shared by pill and dashboard (retires the
+     prior "pill is colorful, dashboard is monochrome" split). Set per
+     element via a `.glass-panel--tint-*` modifier (GlassPanel's `tint`
+     prop); unset is idle/neutral glass. */
+  --tint-violet: 139, 124, 246;
+  --tint-red: 255, 69, 58;
+  --tint-green: 48, 209, 88;
+  --tint-neutral: 255, 255, 255;
+
+  /* Unified palette: the same two tokens every "selected / on / filled"
+     element already read before this rewrite (Sidebar's active nav icon,
+     Toggle's on-track, ActivityChart's active-day bar, LanguageBar's fill)
+     — retinting these two values from flat white to the pill's own violet
+     is what actually unifies the palette. */
+  --surface-active: rgba(139, 124, 246, 0.18);
+  --surface-filled: rgba(139, 124, 246, 0.55);
+  --focus-ring: rgba(139, 124, 246, 0.6);
   --surface-inset: rgba(255, 255, 255, 0.04);
   --surface-track: rgba(255, 255, 255, 0.08);
   --surface-toggle-track: rgba(255, 255, 255, 0.12);
   --surface-hover: rgba(255, 255, 255, 0.16);
-  --radius-panel: 14px;
-  --radius-small: 8px;
+
+  /* Concentricity pass (DESIGN.md's "Shape & concentricity" rule): outer
+     radius = inner radius + the padding between them — bumped slightly
+     from the prior 14/8 to sit correctly against the sidebar's 8px inset. */
+  --radius-panel: 16px;
+  --radius-small: 9px;
 
   /* Reduced a step across the board, 2026-08-31, user-directed — a
      tighter, quieter type scale reads more like a native macOS widget
@@ -91,11 +113,113 @@ body {
   scrollbar-width: none;
 }
 
+/* ============================================================
+   Liquid Glass material — lensing, morph, adaptive tint.
+   Replaces the prior flat `background + backdrop-filter + inset
+   highlight` treatment. See DESIGN.md's "Material system" section
+   for the HIG mechanisms this approximates. Every window still
+   needs its own `windowEffects: hudWindow` native vibrancy
+   underneath (unchanged — see lib.rs's setup()); this is the CSS
+   layer on top of that substrate.
+   ============================================================ */
 .glass-panel {
+  position: relative;
   background: var(--glass-bg);
-  backdrop-filter: blur(28px) saturate(1.5);
-  -webkit-backdrop-filter: blur(28px) saturate(1.5);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(26px) saturate(1.5);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.4);
+  isolation: isolate;
+  transition:
+    background var(--duration-base) var(--ease-standard),
+    backdrop-filter var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
+}
+
+/* Lensing rim — a gradient border standing in for real-time light-bending
+   at the glass edge (brightest top-left, fading around the rest), instead
+   of the prior flat 1px inset highlight. `border-radius: inherit` picks up
+   whatever radius utility (rounded-pill/panel/small) the host element
+   carries, since a pseudo-element inherits from its generating element. */
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 30%,
+    rgba(255, 255, 255, 0.04) 60%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Adaptive tint — a soft state-derived wash blended into the glass via
+   mix-blend-mode rather than a flat fill, approximating Liquid Glass's
+   content-adaptive color behavior. Set by a `.glass-panel--tint-*`
+   modifier; unset (--tint-strength: 0) is idle/neutral glass. */
+.glass-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    120% 140% at 20% -10%,
+    rgba(var(--tint, var(--tint-neutral)), var(--tint-strength, 0)) 0%,
+    transparent 60%
+  );
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  transition: background 260ms var(--ease-standard);
+}
+
+.glass-panel--tint-violet {
+  --tint: var(--tint-violet);
+  --tint-strength: 0.5;
+}
+.glass-panel--tint-red {
+  --tint: var(--tint-red);
+  --tint-strength: 0.5;
+}
+.glass-panel--tint-green {
+  --tint: var(--tint-green);
+  --tint-strength: 0.5;
+}
+
+/* Morph — glass gets visually "thicker" as it grows (Apple's own
+   documented behavior for an expanding glass element): more blur, more
+   saturation, deeper shadow, stronger lensing. Applied to the pill's wide
+   states and every persistent full-size surface (dashboard card,
+   onboarding/recovery modals) — the app's biggest glass elements, and
+   `.glass-panel`'s own transition (above) animates thin<->thick together
+   with whatever width/layout change triggered it, on the same duration
+   (DESIGN.md's Motion rule — thickness and width read as one behavior). */
+.glass-panel--thick {
+  background: var(--glass-bg-thick);
+  backdrop-filter: blur(34px) saturate(1.65);
+  -webkit-backdrop-filter: blur(34px) saturate(1.65);
+  box-shadow:
+    0 18px 40px -12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.glass-panel--thick::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.16) 30%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
 }
 
 /* Activity chart entrance — compositor-only (transform, not height), same
