@@ -117,6 +117,12 @@ Not acted on now — no evidence yet that this is a real problem in practice, an
 
 Not acted on now — Screen Recording rarely shows any interactive dialog at all on current macOS (see this session's `/investigate`-adjacent finding on `CGRequestScreenCaptureAccess`'s real-world behavior), so the realistic overlap is likely rare. If live verification shows this is actually confusing, the fix is probably a small UI beat (e.g. ~500ms, or wait for window focus to return) between the accessibility and screen-recording calls specifically.
 
+## develop/main branch-sync process gap: squash-merging develop→main severs the ancestry link main's strict up-to-date check needs
+
+**Surfaced 2026-09-02 while cutting the v0.3.0 release.** `main`'s branch protection has `required_status_checks.strict: true` ("require branches up to date before merging"), which means a subsequent `develop` → `main` PR is only mergeable if `main`'s current tip is an ancestor of `develop`. A squash merge of `develop` into `main` creates a brand-new single-parent commit on `main` that never lands in `develop`'s own history — even though file content stays identical — so the next `develop` → `main` PR gets blocked as "out of date" for no real reason. This happened twice in a row during the v0.3.0 release (PR #24, then again after PR #26), each requiring a manual merge-commit sync of `main` back into `develop` to close the gap — complicated further by `develop`'s own `required_linear_history` protection, which hides the "create a merge commit" option in GitHub's PR UI, so the sync had to be a direct `git push` of a locally-built merge commit rather than a normal PR merge.
+
+Not fixed now — this is a process fix, not a code fix. `CONTRIBUTING.md` already prescribes a real merge commit (not squash) for `release/`/`hotfix`-style merges into `main`; switching the `develop` → `main` merge specifically to "Create a merge commit" as standard practice (instead of whatever GitHub's PR merge button defaults to) should stop this recurring every release cycle, since a real merge commit keeps `develop`'s tip as a direct parent of `main`'s new tip.
+
 ## DONE — Grammar cleanup Option B (local-LLM cleanup)
 
 Built 2026-08-30 (`engine/llm_cleanup.rs`, `engine/pipeline.rs`), ahead of
