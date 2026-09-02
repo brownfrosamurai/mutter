@@ -53,10 +53,15 @@
 /// Liquid Glass (`NSGlassEffectView`, real public `cornerRadius`) via
 /// `window-vibrancy`'s `apply_liquid_glass`, falling back to flat
 /// `NSVisualEffectView` vibrancy on older macOS. Called once, at startup,
-/// for both the dashboard (`DASHBOARD_SHELL_RADIUS`) and the pill
-/// (`PILL_SHELL_RADIUS`) — see `lib.rs`'s `setup()`. Does not need
-/// reapplying on resize, and does not depend on the window's visibility at
-/// call time (it stays correct whenever the window is later shown).
+/// for the dashboard and pill (`DASHBOARD_SHELL_RADIUS`/`PILL_SHELL_RADIUS`,
+/// both applied before those windows are ever shown) — see `lib.rs`'s
+/// `setup()`. Does not need reapplying on resize. Call ordering DOES matter,
+/// unlike this doc previously claimed: onboarding/recovery are shown from
+/// inside `setup()` itself (not from a separate later code path the way
+/// dashboard/pill are), and calling `.show()` before this produced a window
+/// with no vibrancy at all — a real, live-found bug (pre-landing review,
+/// 2026-09-01) fixed by moving each window's call to immediately before its
+/// own `.show()`. Always call this before showing a window, never after.
 pub fn apply_glass_shell<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, radius: f64) {
     let window_for_webview = window.clone();
     let result = window.with_webview(move |platform_webview| {

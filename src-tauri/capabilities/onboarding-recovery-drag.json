@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "onboarding-recovery-drag",
+  "description": "Onboarding and Recovery are chromeless (decorations: false, migrated onto apply_glass_shell 2026-09-01) with data-tauri-drag-region=\"deep\" on their root panels (Onboarding.tsx, Recovery.tsx) so the window can be repositioned like the pill/dashboard already are — but the drag attribute alone does nothing without a capability granting core:window:allow-start-dragging, same gap class this repo already hit twice (pill.json's pill-events gap, pill-drag.json's own creation). Separate file from pill-drag.json since these two windows share no other concern with the pill.",
+  "windows": ["onboarding", "recovery"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

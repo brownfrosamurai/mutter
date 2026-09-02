@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required because bundle.macOS.signingIdentity is a real (non-adhoc)
+	     identity, which makes Tauri enable Hardened Runtime by default
+	     (tauri-utils's hardened_runtime defaults to true). Under Hardened
+	     Runtime, AVCaptureDevice.requestAccessForMediaType: for audio
+	     resolves to denied before ever reaching tccd unless this
+	     entitlement is present, confirmed live via codesign's own
+	     entitlements-display flag showing nothing, plus a 45 minute
+	     `log show` with zero tccd lines mentioning this app's bundle id
+	     despite clicking Grant. Accessibility/Screen Recording need no
+	     equivalent entry, neither is a Hardened Runtime Resource Access
+	     category, only Mic/Camera/Location/etc. are. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

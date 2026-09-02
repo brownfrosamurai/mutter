@@ -276,13 +276,12 @@ pub enum PermissionKind {
     ScreenRecording,
 }
 
-/// Deep-links to the matching System Settings pane for Accessibility and
-/// Screen Recording (macOS has no active-request API for either — unlike
-/// mic, see `request_mic_access` below). Also the fallback path for mic
-/// once its one-shot native prompt (`request_mic_access`) has already been
-/// answered, since that prompt won't show again.
+/// Deep-link fallback to the matching System Settings pane, for any
+/// permission once its own active-request path (`request_permission`
+/// below) is no longer productive to retry — mic's native prompt is a true
+/// one-shot, so this is its only recovery path after a denial.
 ///
-/// `async` + `spawn_blocking`, matching `request_mic_access` right below —
+/// `async` + `spawn_blocking`, matching `request_permission` right below —
 /// a plain sync `#[tauri::command]` runs on the same thread that dispatches
 /// the IPC message (the main/UI thread for the default wry/WKWebView
 /// backend), so `Command::status()`'s blocking wait for `open` to launch
@@ -313,21 +312,40 @@ async fn open_permission_settings(kind: PermissionKind) -> Result<(), String> {
     Ok(())
 }
 
-/// Shows the real native macOS mic-permission prompt (Outside Voice finding
-/// #2 from the onboarding-flow plan review — mic gets an active request,
-/// unlike Accessibility/Screen Recording, which stay on
-/// `open_permission_settings` above). Blocking, so it's dispatched onto
-/// Tauri's blocking-task pool rather than the async command's own task —
-/// never call the underlying native function from the main thread.
+/// Shows the real native active-request prompt for any of the three
+/// permission kinds — one command instead of three near-duplicates,
+/// mirroring `PermissionGate<T>`'s own DRY design and `SettingField`'s
+/// established enum-dispatch pattern. Replaces the old mic-only
+/// `request_mic_access` now that Accessibility and Screen Recording have
+/// real `request()` implementations too (`permissions.rs`, design review
+/// 2026-09-01) — Accessibility/Screen Recording no longer need to stay on
+/// `open_permission_settings` alone.
+///
+/// SAFETY INVARIANT: blocking, dispatched onto Tauri's blocking-task pool
+/// (`spawn_blocking`) — this MUST NEVER run on the main/UI thread. Every
+/// `PermissionGate<T>::request()` this dispatches to internally calls
+/// `run_on_main_thread` (`permissions.rs`), which does a synchronous
+/// `dispatch_sync` onto the main queue — calling this command's body
+/// directly from the main thread would deadlock (`dispatch_sync` onto the
+/// queue you're already running on never returns). `spawn_blocking` is
+/// what guarantees this call always originates off the main thread; do not
+/// remove it or call `PermissionGate::request()` from any other context.
 #[tauri::command]
 #[specta::specta]
-async fn request_mic_access() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let mut gate = permissions::PermissionGate::<permissions::Mic>::new();
-        gate.request()
+async fn request_permission(kind: PermissionKind) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || match kind {
+        PermissionKind::Microphone => {
+            permissions::PermissionGate::<permissions::Mic>::new().request()
+        }
+        PermissionKind::Accessibility => {
+            permissions::PermissionGate::<permissions::Accessibility>::new().request()
+        }
+        PermissionKind::ScreenRecording => {
+            permissions::PermissionGate::<permissions::SystemAudio>::new().request()
+        }
     })
     .await
-    .map_err(|e| format!("mic permission request task panicked: {e}"))
+    .map_err(|e| format!("permission request task panicked: {e}"))
 }
 
 /// Marks onboarding as finished — persisted so it never shows again — then
@@ -701,7 +719,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         copy_history_text,
         get_permission_status,
         open_permission_settings,
-        request_mic_access,
+        request_permission,
         complete_onboarding,
         quit_app,
         get_recovery_info,
@@ -815,6 +833,17 @@ pub fn run() {
                         let _ = win.close();
                     }
                     if let Some(win) = app.get_webview_window("recovery") {
+                        // Shell applied here, before `.show()` — see the
+                        // pre-landing review note on `should_show_onboarding`
+                        // below for why show-before-shell is the wrong order
+                        // for this window specifically (a real adversarial
+                        // review finding, 2026-09-01: this window is shown
+                        // inside setup() itself, unlike dashboard/pill which
+                        // are always shown later from separate code paths —
+                        // the "correct whenever later shown" comment on the
+                        // shared apply_glass_shell block further down never
+                        // actually applied to recovery/onboarding).
+                        vibrancy::apply_glass_shell(&win, DASHBOARD_SHELL_RADIUS);
                         let _ = win.show();
                         let _ = win.set_focus();
                     }
@@ -849,6 +878,17 @@ pub fn run() {
             // unit-testable without standing up a real `tauri::App`.
             if should_show_onboarding(in_recovery, onboarding_completed) {
                 if let Some(win) = app.get_webview_window("onboarding") {
+                    // Shell applied here, before `.show()` (pre-landing
+                    // review, 2026-09-01) — see recovery's matching comment
+                    // above for why: this window is shown inside setup()
+                    // itself, so the shared apply_glass_shell block further
+                    // down (whose own comment claims correctness regardless
+                    // of show/hide timing) would otherwise run AFTER this
+                    // window is already visible, the reverse of dashboard/
+                    // pill's shell-then-show ordering — the only ordering
+                    // this native `NSGlassEffectView` reparenting mechanism
+                    // has actually been live-verified against.
+                    vibrancy::apply_glass_shell(&win, DASHBOARD_SHELL_RADIUS);
                     let _ = win.show();
                     let _ = win.set_focus();
                 }
@@ -879,6 +919,24 @@ pub fn run() {
             if let Some(win) = app.get_webview_window("pill") {
                 vibrancy::apply_glass_shell(&win, PILL_SHELL_RADIUS);
             }
+            // Onboarding and Recovery migrated onto the same mechanism
+            // 2026-09-01 (design-consultation + design review) — both
+            // previously sat a full generation behind on declarative
+            // `windowEffects: hudWindow` (flat vibrancy) plus native
+            // `decorations: true`, while dashboard/pill were already fully
+            // chromeless with this real `NSGlassEffectView`-backed shell.
+            // Radius matches `--radius-panel` (16px), same as the
+            // dashboard's own card — both are `.glass-panel` "thick"
+            // surfaces at the same corner scale, not a new value.
+            //
+            // NOT applied here, unlike dashboard/pill above — moved inline
+            // to right before each window's own `.show()` call further up
+            // in this function (pre-landing review, 2026-09-01: this
+            // shared block runs after onboarding/recovery are already
+            // shown when either is the active first-run path, the reverse
+            // of dashboard/pill's shell-then-show ordering — the only
+            // ordering this native `NSGlassEffectView` reparenting
+            // mechanism has actually been live-verified against).
 
             // The dashboard window is meant to persist for the app's whole
             // lifetime and be shown/hidden (via the tray's "Open Dashboard"
