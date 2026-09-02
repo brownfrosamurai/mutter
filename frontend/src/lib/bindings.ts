@@ -84,13 +84,12 @@ async getPermissionStatus() : Promise<PermissionStatusDto> {
     return await TAURI_INVOKE("get_permission_status");
 },
 /**
- * Deep-links to the matching System Settings pane for Accessibility and
- * Screen Recording (macOS has no active-request API for either — unlike
- * mic, see `request_mic_access` below). Also the fallback path for mic
- * once its one-shot native prompt (`request_mic_access`) has already been
- * answered, since that prompt won't show again.
+ * Deep-link fallback to the matching System Settings pane, for any
+ * permission once its own active-request path (`request_permission`
+ * below) is no longer productive to retry — mic's native prompt is a true
+ * one-shot, so this is its only recovery path after a denial.
  * 
- * `async` + `spawn_blocking`, matching `request_mic_access` right below —
+ * `async` + `spawn_blocking`, matching `request_permission` right below —
  * a plain sync `#[tauri::command]` runs on the same thread that dispatches
  * the IPC message (the main/UI thread for the default wry/WKWebView
  * backend), so `Command::status()`'s blocking wait for `open` to launch
@@ -106,16 +105,28 @@ async openPermissionSettings(kind: PermissionKind) : Promise<Result<null, string
 }
 },
 /**
- * Shows the real native macOS mic-permission prompt (Outside Voice finding
- * #2 from the onboarding-flow plan review — mic gets an active request,
- * unlike Accessibility/Screen Recording, which stay on
- * `open_permission_settings` above). Blocking, so it's dispatched onto
- * Tauri's blocking-task pool rather than the async command's own task —
- * never call the underlying native function from the main thread.
+ * Shows the real native active-request prompt for any of the three
+ * permission kinds — one command instead of three near-duplicates,
+ * mirroring `PermissionGate<T>`'s own DRY design and `SettingField`'s
+ * established enum-dispatch pattern. Replaces the old mic-only
+ * `request_mic_access` now that Accessibility and Screen Recording have
+ * real `request()` implementations too (`permissions.rs`, design review
+ * 2026-09-01) — Accessibility/Screen Recording no longer need to stay on
+ * `open_permission_settings` alone.
+ * 
+ * SAFETY INVARIANT: blocking, dispatched onto Tauri's blocking-task pool
+ * (`spawn_blocking`) — this MUST NEVER run on the main/UI thread. Every
+ * `PermissionGate<T>::request()` this dispatches to internally calls
+ * `run_on_main_thread` (`permissions.rs`), which does a synchronous
+ * `dispatch_sync` onto the main queue — calling this command's body
+ * directly from the main thread would deadlock (`dispatch_sync` onto the
+ * queue you're already running on never returns). `spawn_blocking` is
+ * what guarantees this call always originates off the main thread; do not
+ * remove it or call `PermissionGate::request()` from any other context.
  */
-async requestMicAccess() : Promise<Result<boolean, string>> {
+async requestPermission(kind: PermissionKind) : Promise<Result<boolean, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("request_mic_access") };
+    return { status: "ok", data: await TAURI_INVOKE("request_permission", { kind }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

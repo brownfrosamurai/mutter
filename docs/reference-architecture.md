@@ -44,7 +44,7 @@ Not hand-written Swift (the project's hard constraint) — small, build-time-com
 | `system_audio_shim.{h,m}` | `ScreenCaptureKit` (`SCStream`, audio-only capture) | `build.rs`'s `build_system_audio_shim()` |
 | `permissions_shim.{h,m}` | `AVCaptureDevice` mic-authorization status + request prompt | `build.rs`'s `build_permissions_shim()` |
 
-(The third shim this project once had, `vibrancy_mask_shim.{h,m}`, was retired 2026-09-01 — both windows now use `window-vibrancy`'s `apply_liquid_glass` instead. See [`explanation-glass-shell.md`](explanation-glass-shell.md).)
+(The third shim this project once had, `vibrancy_mask_shim.{h,m}`, was retired 2026-09-01 — all four windows now use `window-vibrancy`'s `apply_liquid_glass` instead. See [`explanation-glass-shell.md`](explanation-glass-shell.md).)
 
 ## Frontend module map (`frontend/src/`)
 
@@ -53,7 +53,7 @@ Not hand-written Swift (the project's hard constraint) — small, build-time-com
 | `windows/dashboard/` | The settings/metrics window — `App.tsx` (shell), `panels/Stats.tsx`, `panels/History.tsx`, `panels/Settings.tsx` |
 | `windows/pill/` | The floating recording HUD — `Pill.tsx`, one component, four states (`loading`/`listening`/`canceling`/`done`) |
 | `windows/recovery/` | The migration-failure recovery screen — shown only when `HistoryStore::open()` fails |
-| `windows/onboarding/` | The first-run 3-step flow (`Welcome` → `Permissions` → `Ready`) |
+| `windows/onboarding/` | The first-run 2-step flow (`Welcome` → `Ready`) — `Ready` auto-fires all three permission requests sequentially on mount instead of requiring a per-permission Grant click |
 | `components/` | Shared UI: `GlassPanel` (the material system), `Toggle`, `SettingRow`, `HotkeyCapture`, `ActivityChart`, `StatTile`, `LatencyTable`, `PermissionRow`, `Sidebar`, `TrafficLights`, `ErrorBoundary` |
 | `lib/bindings.ts` | **Generated** — typed `invoke` wrappers + every DTO, from `cargo test --lib export_bindings -- --ignored`. Never hand-edit. |
 | `lib/hooks.ts` | `usePermissionsQuery` — the one non-trivial shared data-fetching hook |
@@ -66,8 +66,8 @@ Not hand-written Swift (the project's hard constraint) — small, build-time-com
 |---|---|---|---|
 | Dashboard | `dashboard` | Tray → "Open Dashboard", or after onboarding completes | Custom (`TrafficLights.tsx`) |
 | Pill | `pill` | A recording is active (hotkey pressed) | None — a borderless capsule |
-| Recovery | `recovery` | `HistoryStore::open()` returned `MigrationFailed` at startup | Native |
-| Onboarding | `onboarding` | First run (`AppSettings.onboarding_completed == false`), unless recovery mode wins | Native |
+| Recovery | `recovery` | `HistoryStore::open()` returned `MigrationFailed` at startup | None — chromeless, `data-tauri-drag-region` for window dragging (migrated off native decorations 2026-09-01) |
+| Onboarding | `onboarding` | First run (`AppSettings.onboarding_completed == false`), unless recovery mode wins | None — chromeless, `data-tauri-drag-region` for window dragging (migrated off native decorations 2026-09-01) |
 
 All four are `transparent: true` with real native vibrancy underneath (see [`explanation-glass-shell.md`](explanation-glass-shell.md)) — none of them are ever destroyed once created; they're shown/hidden for the app's whole lifetime (`ActivationPolicy::Accessory`, no Dock icon, menu-bar-only).
 

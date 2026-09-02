@@ -4,12 +4,16 @@ Every window in Mutter is `transparent: true` with real macOS window vibrancy un
 
 ## The current mechanism: `vibrancy::apply_glass_shell`
 
-One function (`src-tauri/src/vibrancy.rs`), called once per window at startup from `lib.rs`'s `setup()` — never re-applied on resize or layout change:
+One function (`src-tauri/src/vibrancy.rs`), called once per window at startup from `lib.rs`'s `setup()` — never re-applied on resize or layout change. All four windows go through it now (onboarding and recovery migrated 2026-09-01, matching dashboard/pill's earlier migration):
 
 ```rust
-vibrancy::apply_glass_shell(&dashboard_window, DASHBOARD_SHELL_RADIUS); // 16.0
-vibrancy::apply_glass_shell(&pill_window, PILL_SHELL_RADIUS);           // session::PILL_HEIGHT / 2.0
+vibrancy::apply_glass_shell(&dashboard_window, DASHBOARD_SHELL_RADIUS);  // 16.0
+vibrancy::apply_glass_shell(&pill_window, PILL_SHELL_RADIUS);            // session::PILL_HEIGHT / 2.0
+vibrancy::apply_glass_shell(&onboarding_window, DASHBOARD_SHELL_RADIUS); // same radius as dashboard
+vibrancy::apply_glass_shell(&recovery_window, DASHBOARD_SHELL_RADIUS);   // same radius as dashboard
 ```
+
+Onboarding and recovery share the dashboard's radius and its dead-space trade-off (below), but not its call-site timing: both are shown directly inside `setup()` itself (recovery on a migration failure, onboarding on first run), so the shell has to be applied *before* `.show()` right there — the shared post-`setup()` block dashboard/pill use, whose own comment claims correctness "whenever the window is later shown," never actually covers a window shown from inside `setup()` itself. Getting this ordering backwards was a real bug caught by a pre-landing adversarial review (2026-09-01): a window briefly visible without its glass shell applied.
 
 On macOS 26+ (Tahoe), this is `window-vibrancy` 0.8's `apply_liquid_glass` — Apple's real `NSGlassEffectView`, with a genuine public `cornerRadius` property and a `content_view` option that **reparents the WKWebView into the glass view** instead of leaving it a sibling. On older macOS it falls back to plain `apply_vibrancy` (flat, unrounded `NSVisualEffectView`).
 

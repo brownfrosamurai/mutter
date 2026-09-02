@@ -3,7 +3,19 @@ import { commands } from "@/lib/bindings";
 import { GlassPanel } from "@/components/GlassPanel";
 
 /** Shown instead of pill/dashboard only when HistoryStore::open() returns
- * MigrationFailed (Section 11) — see lib.rs's setup(). */
+ * MigrationFailed (Section 11) — see lib.rs's setup().
+ *
+ * `data-tauri-drag-region="deep"` makes the window draggable everywhere
+ * except the Quit button (BUTTON tags are excluded by Tauri's drag.js
+ * regardless of an ancestor's drag attribute) — required now that this
+ * window is chromeless (migrated off native `decorations: true` alongside
+ * Onboarding, 2026-09-01), previously relied on the native title bar. The
+ * backup-path `<code>` block gets an explicit `data-tauri-drag-region="false"`
+ * override (pre-landing review, 2026-09-01) — without it, a click-drag over
+ * the one piece of text on this screen a user actually needs to select and
+ * copy (to paste into a support request) would move the window instead of
+ * selecting text; `false` walks up from the click target first in Tauri's
+ * drag.js, so it wins over the ancestor's `deep`. */
 export function Recovery() {
   const [backupPath, setBackupPath] = useState<string | null>(null);
 
@@ -13,7 +25,11 @@ export function Recovery() {
 
   return (
     <div className="flex h-screen items-center justify-center p-4">
-      <GlassPanel thick className="max-w-md rounded-panel p-6 text-center">
+      <GlassPanel
+        thick
+        data-tauri-drag-region="deep"
+        className="max-w-md rounded-panel p-6 text-center"
+      >
         <div aria-hidden="true" className="mx-auto mb-4 h-10 w-10 text-warning">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-2.96L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -26,7 +42,10 @@ export function Recovery() {
         </p>
         <div className="mt-4 rounded-small border border-glass-border bg-surface-inset p-3 text-left">
           <p className="text-xs text-text-secondary">Your existing history was backed up to:</p>
-          <code className="mt-1 block break-all text-xs text-text-primary">
+          <code
+            data-tauri-drag-region="false"
+            className="mt-1 block break-all text-xs text-text-primary"
+          >
             {backupPath ?? "(no backup path available)"}
           </code>
         </div>

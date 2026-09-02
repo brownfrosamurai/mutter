@@ -43,6 +43,16 @@ shim function + command this adds.
 
 ## Architecture
 
+> **Superseded 2026-09-01** — the 3-step shell described below (Welcome →
+> Permissions → Ready, button-driven Grant per permission) was replaced by a
+> 2-step shell (Welcome → Ready, all 3 permissions auto-requested on Ready's
+> mount) per user direction ("make the flow lean and straightforward"),
+> reviewed via `/plan-eng-review` the same day. The `ONBOARDING WINDOW`
+> diagram just below is updated to reflect the new shape; the rest of this
+> document (backend command shapes, `PermissionGate<T>` architecture, Outside
+> Voice findings) still describes real, current infrastructure this change
+> builds on top of, not just history.
+
 A 4th window, `onboarding`, following the exact same pattern `recovery`
 already establishes: its own HTML entry, its own React root, shown instead of
 the normal pill/dashboard flow under one condition, closed permanently once
@@ -77,42 +87,85 @@ STARTUP FLOW (lib.rs setup(), after history::open() resolves)
 ```
 
 ```
-ONBOARDING WINDOW — 3-step shell (mirrors recovery's window-per-flow pattern)
+ONBOARDING WINDOW — 2-step shell, superseded 2026-09-01 (see note above)
+(mirrors recovery's window-per-flow pattern; nav shell itself untouched)
 
   Onboarding.tsx (shell: step index, progress bar, back/skip/continue nav)
         │
         ├─ step 0: Welcome.tsx        — static copy, no backend call
+        │                                "Skip" here still bypasses onboarding
+        │                                entirely (unchanged) — 0 permission
+        │                                requests fire if skipped
         │
-        ├─ step 1: Permissions.tsx    — reuses commands.getPermissionStatus()
-        │                                (already exists, already used by
-        │                                Settings.tsx's Permissions section)
-        │                                Mic "Grant" → commands.requestMicAccess()
-        │                                (new — a real native permission PROMPT,
-        │                                not a System Settings redirect; see
-        │                                Outside Voice finding #2 below)
-        │                                Accessibility/Screen Recording "Grant" →
-        │                                commands.openPermissionSettings(kind)
-        │                                (new, thin — opens one System Settings
-        │                                pane per permission via `open`; macOS has
-        │                                no active-request API for either, so
-        │                                System Settings is the only real path)
-        │                                Refetches on window `focus` (Architecture
-        │                                review finding #1) — Grant sends the user
-        │                                to System Settings and back (or, for mic,
-        │                                the native prompt resolves in-process but
-        │                                a refetch after it still confirms the
-        │                                real post-prompt status rather than
-        │                                trusting the promise's own return value)
-        │                                so a stale one-shot fetch would keep
-        │                                showing "not granted" after they actually
-        │                                granted it
-        │
-        └─ step 2: Ready.tsx          — reuses commands.getSettings() for the
-                                         real mic_hotkey/system_audio_hotkey
-                                         (already exists)
+        └─ step 1: Ready.tsx          — TWO-PHASE screen (design review,
+                                         2026-09-01 — see decisions below):
+                                         Phase A ("Setting things up", while
+                                         any request is queued/in-flight):
+                                         permission rows are the primary
+                                         visual focus, hotkey rows hidden.
+                                         Phase B ("You're all set", once all
+                                         3 requests have resolved — granted
+                                         OR denied, not gated on approval):
+                                         hotkey rows revealed, permission rows
+                                         become secondary/compact.
+                                         On mount, BEFORE firing anything:
+                                         calls commands.getPermissionStatus()
+                                         and skips any kind already
+                                         Granted/Denied — this is the real
+                                         re-entry guard (persists via actual
+                                         OS/TCC state, not component-local
+                                         React state that resets on every
+                                         Ready remount from Back→Continue).
+                                         For kinds still eligible, sequentially
+                                         awaits commands.requestPermission(kind)
+                                         for mic → accessibility →
+                                         screen_recording, checking
+                                         res.status==="error" on each (logs
+                                         inline, continues to the next kind —
+                                         one shim failure never blocks the
+                                         other two) — unified command, replaces
+                                         the old per-kind requestMicAccess/
+                                         openPermissionSettings split for the
+                                         active-request path — Settings.tsx's
+                                         PermissionRow now uses the same
+                                         command, kind-specific gated: mic
+                                         stays "not yet denied", accessibility/
+                                         screen_recording always try since
+                                         their refresh() never reports
+                                         NotRequested, only Granted/Denied.
+                                         Each row's PermissionRow status-only
+                                         mode takes an explicit
+                                         queued|requesting|granted|denied
+                                         prop Ready.tsx controls directly
+                                         (not PermissionRow's own internal
+                                         click-driven pending — the auto-fire
+                                         path doesn't go through that code at
+                                         all). Row style unified to the
+                                         hotkey rows' bg-surface-inset card
+                                         treatment (no border-b divider) so
+                                         both groups read as one list, per
+                                         DESIGN.md's "no box borders on
+                                         recessed elements" rule.
+                                         A small "Quit" text button (quiet,
+                                         not danger-styled — commands.quitApp(),
+                                         same pattern as Recovery.tsx) gives
+                                         this first-run screen its own exit
+                                         path now that the native traffic
+                                         light is gone.
                                          "Open Dashboard" → commands.completeOnboarding()
                                          then shows dashboard, closes onboarding
 ```
+
+## Design review decisions (2026-09-01, `/plan-design-review`)
+
+Outside-voice-surfaced, all resolved via individual `AskUserQuestion`:
+
+1. **Ready.tsx's copy/hierarchy whiplashed** — "You're all set" is a closing statement, but landing on this screen also triggers 3 back-to-back OS security prompts. Fixed via the two-phase Setting-things-up → You're-all-set structure above.
+2. **Interaction states were named, not specified** — `PermissionRow`'s status-only mode needed an explicit externally-controlled status prop; the auto-fire path bypasses `PermissionRow`'s own click-driven pending state entirely. Fixed above.
+3. **Row style mismatch** — `PermissionRow`'s `border-b` dividers vs. the hotkey rows' borderless `bg-surface-inset` cards, visible for the first time on the one screen showing both. Unified to the card treatment.
+4. **Onboarding lost its only quit affordance** going chromeless — the tray-Quit-is-sufficient reasoning holds for Recovery (reached only by an existing user) but not Onboarding (the first screen a brand-new user ever sees). Fixed with a dedicated Quit button.
+5. **Drag-region placement** — going chromeless needs `data-tauri-drag-region` (confirmed required via `Pill.tsx`/`App.tsx` precedent), but naive placement swallows clicks on Back/Skip/Continue/dots. Resolved by checking Tauri's actual `drag.js` source directly (not assumed): `data-tauri-drag-region="deep"` on the whole panel excludes real clickable elements (`BUTTON`/`A`/`INPUT`/etc.) by tag name automatically, regardless of an ancestor's drag attribute — no dead-space strip needed. Applied to `Onboarding.tsx`'s and `Recovery.tsx`'s root `GlassPanel`; `Recovery.tsx`'s backup-path `<code>` block gets an explicit `data-tauri-drag-region="false"` override since it's plain text, not an excluded tag, and the user needs to select/copy it.
+6. **The eng-reviewed one-shot `useRef` guard doesn't survive Back→Continue** — a real unmount (Ready.tsx stops rendering) discards the ref; a fresh mount gets a fresh guard. Verified correct, with one correction to the outside voice's claimed mechanism: re-firing doesn't reopen System Settings (the auto-fire path never calls `openPermissionSettings`), but Accessibility's trust alert specifically CAN reappear after a prior denial, so repeated cycling would repeat that one alert. Fixed by checking real `getPermissionStatus()` before firing each kind, skipping already-decided ones — guards via actual OS state, not component-local state.
 
 ## Backend changes
 

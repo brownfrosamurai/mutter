@@ -3024,7 +3024,7 @@ dependencies = [
 
 [[package]]
 name = "mutter"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "accessibility-sys",
  "async-trait",
@@ -3036,6 +3036,7 @@ dependencies = [
  "core-foundation-sys",
  "core-graphics",
  "cpal",
+ "dispatch2",
  "hound",
  "objc2",
  "objc2-app-kit",

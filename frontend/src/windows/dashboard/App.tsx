@@ -52,16 +52,16 @@ export function App() {
       >
         <div
           data-tauri-drag-region
-          className="absolute inset-x-0 top-0 z-10 flex h-11 items-center justify-between px-4"
+          className="absolute inset-x-0 top-0 z-10 flex h-11 items-center justify-between px-4 rounded-t-panel"
         >
           <TrafficLights />
-          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-lg uppercase tracking-wide text-text-primary">
+          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-lg tracking-wide text-text-primary">
             {PANEL_TITLE[active]}
           </span>
           <span className="w-[52px]" aria-hidden="true" />
         </div>
 
-        <div className="h-full select-none overflow-y-auto px-4 pb-4 pt-12">
+        <div className="h-full select-none overflow-y-auto px-4 pb-4 pt-16">
           <ErrorBoundary key={active}>
             {active === "stats" && <StatsPanel />}
             {active === "history" && <HistoryPanel />}
