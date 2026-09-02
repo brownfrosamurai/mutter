@@ -2,6 +2,15 @@
 
 All notable changes to Mutter are documented in this file.
 
+## [0.3.0] - 2026-09-02
+
+### Added
+- The dashboard's Activity chart now renders as one smooth wave (a Catmull-Rom spline with a gradient fill) instead of 7 discrete bars, matching the app's voice/waveform identity. The dashboard window is also a bit wider and taller (640×460) so the Metrics panel's tiles, chart, and latency table fit without clipping.
+
+### Fixed
+- Fixed Whisper occasionally inserting non-speech artifacts like "[BLANK_AUDIO]" or "[MUSIC]" into transcripts during silence or background noise — these no longer appear in dictated text.
+- Transcription is also faster: leading and trailing silence around a recording is now trimmed before it's sent for transcription.
+
 ## [0.2.0] - 2026-09-01
 
 ### Added
