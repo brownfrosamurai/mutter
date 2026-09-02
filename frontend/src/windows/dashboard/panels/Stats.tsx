@@ -67,7 +67,7 @@ export function StatsPanel() {
   const streak = activity.data ? computeStreak(activity.data) : 0;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col justify-between gap-4">
       {/* 4-tile grid matching the design-consultation preview's Sessions/
           Words/WPM/Saved layout exactly (2026-09-01, user-directed) — "Saved"
           uses metrics.time_saved_minutes, a real backend field that existed

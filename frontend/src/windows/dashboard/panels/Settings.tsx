@@ -203,7 +203,7 @@ export function SettingsPanel() {
         <h2 className="mb-1 text-xs uppercase tracking-wide text-text-secondary">
           Permissions
         </h2>
-        <div>
+        <div className="flex flex-col gap-2">
           {(
             [
               "mic",
