@@ -22,7 +22,7 @@ Every command the frontend can call into Rust is defined once, in `src-tauri/src
 
    - `Result<T, String>` if the command can meaningfully fail — the frontend gets `{status: "ok"|"error", ...}`, not a thrown exception (see [`reference-commands.md`](reference-commands.md)'s "Calling convention" for why this matters on the frontend side).
    - A bare return type (no `Result`) only for commands that genuinely cannot fail in a way the caller needs to handle.
-   - `async fn` + `tauri::async_runtime::spawn_blocking(...)` for anything that blocks — a plain sync command runs on the same thread that dispatches the IPC message (the main/UI thread), so a blocking call there stalls the whole UI. `open_permission_settings` and `request_mic_access` in `lib.rs` are the reference examples.
+   - `async fn` + `tauri::async_runtime::spawn_blocking(...)` for anything that blocks — a plain sync command runs on the same thread that dispatches the IPC message (the main/UI thread), so a blocking call there stalls the whole UI. `open_permission_settings` and `request_permission` in `lib.rs` are the reference examples.
 
 2. **If it takes or returns a custom struct**, derive `specta::Type` on it (alongside `serde::Serialize`/`Deserialize` as needed):
 

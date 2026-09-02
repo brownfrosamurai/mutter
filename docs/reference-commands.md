@@ -37,7 +37,7 @@ if (res.status === "error") {
 |---|---|---|---|
 | `getPermissionStatus` | `()` | `PermissionStatusDto` (bare, not `Result`) | Live-queried mic/accessibility/system_audio status strings: `"not_requested" \| "denied" \| "granted" \| "unavailable"` |
 | `openPermissionSettings` | `(kind: PermissionKind)` | `Result<null, string>` | Deep-links to System Settings' matching pane. `PermissionKind` = `"microphone" \| "accessibility" \| "screen_recording"` |
-| `requestMicAccess` | `()` | `Result<boolean, string>` | Shows the real native mic-permission prompt (mic is the only permission with an active-request API) |
+| `requestPermission` | `(kind: PermissionKind)` | `Result<boolean, string>` | Shows the real native active-request prompt for any of the three permission kinds — mic (`AVCaptureDevice`), Accessibility (`AXIsProcessTrustedWithOptions`), or Screen Recording (`CGRequestScreenCaptureAccess`) |
 
 ### Session control
 

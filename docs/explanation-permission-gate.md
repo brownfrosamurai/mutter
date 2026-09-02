@@ -34,4 +34,4 @@ Mic is the only one of the three with an OS-level "show me the permission prompt
 ## Related
 
 - [`reference-architecture.md`](reference-architecture.md)
-- [`reference-commands.md`](reference-commands.md) — `get_permission_status`, `open_permission_settings`, `request_mic_access`
+- [`reference-commands.md`](reference-commands.md) — `get_permission_status`, `open_permission_settings`, `request_permission`
