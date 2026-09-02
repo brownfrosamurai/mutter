@@ -6,7 +6,7 @@
    (Apple's macOS Tahoe / WWDC25 design language, replacing the prior flat
    glassmorphism). Material mechanics (lensing, morph, adaptive tint) live
    in `.glass-panel` below. Component-level tint (nav selection, toggle-on,
-   activity/language bar fill) rides on the same two tokens those
+   activity wave/language bar fill) rides on the same two tokens those
    components already consumed pre-rewrite — only the *values* changed,
    which is what unifies the pill's and dashboard's palettes without
    touching those components' call sites. */
@@ -38,7 +38,7 @@
 
   /* Unified palette: the same two tokens every "selected / on / filled"
      element already read before this rewrite (Sidebar's active nav icon,
-     Toggle's on-track, ActivityChart's active-day bar, LanguageBar's fill)
+     Toggle's on-track, ActivityChart's wave stroke/fill, LanguageBar's fill)
      — retinting these two values from flat white to the pill's own violet
      is what actually unifies the palette. */
   --surface-active: rgba(139, 124, 246, 0.18);
@@ -221,17 +221,22 @@ body {
   );
 }
 
-/* Activity chart entrance — compositor-only (transform, not height), same
-   layout-thrash-avoidance pattern already established in this app. Animates
-   to a per-bar dynamic scale via the --bar-scale custom property each bar
-   sets inline (a named @keyframes can't reference a per-element JS value
-   any other way). */
-@keyframes mutter-activity-grow {
-  from {
-    transform: scaleY(0);
-  }
+/* Activity chart entrance (2026-09-02 wave revision) — the wave line itself
+   draws in via a JS-measured `stroke-dashoffset` transition (see
+   ActivityChart.tsx's `useLayoutEffect`), not a named `@keyframes` (SVG's
+   `pathLength` normalization would allow one, but hits a real WebKit
+   dashed-line bug under this chart's non-uniform viewBox scale — see that
+   file's doc comment). Fill and today-dot still animate via opacity only,
+   here. Both are paint/composite-only properties, same layout-thrash-
+   avoidance discipline the old per-bar `scaleY` animation followed. */
+@keyframes mutter-wave-fill {
   to {
-    transform: scaleY(var(--bar-scale, 1));
+    opacity: 1;
+  }
+}
+@keyframes mutter-wave-dot {
+  to {
+    opacity: 1;
   }
 }
 
