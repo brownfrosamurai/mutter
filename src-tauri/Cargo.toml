@@ -2,6 +2,8 @@
 name = "mutter"
 version = "0.2.0"
 description = "Local-first, multi-language speech-to-text dictation for macOS"
+license = "MIT"
+repository = "https://github.com/brownfrosamurai/mutter"
 edition = "2021"
 rust-version = "1.75"
 

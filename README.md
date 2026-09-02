@@ -1,6 +1,11 @@
 # Mutter
 
+[![CI](https://github.com/brownfrosamurai/mutter/actions/workflows/ci.yml/badge.svg)](https://github.com/brownfrosamurai/mutter/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Local-first, multi-language speech-to-text dictation for macOS. Toggle a hotkey, speak, toggle again — text lands at your cursor. A second mode captures system audio (meetings, videos), Granola-style. Everything runs on-device: no subscriptions, no cloud, no network calls after the model downloads once.
+
+**No signed release yet.** There's no notarized, double-click-install `.dmg` — build from source (below). GitHub Releases produced by `.github/workflows/release.yml` are ad-hoc signed, which means macOS Gatekeeper will complain; right-click → Open past the warning, or just build it yourself.
 
 Built for dictating to AI coding agents and general dictation. v1 ships English; Whisper's multilingual model auto-detects and transcribes other languages too (Yoruba, Spanish, Italian, French, Arabic were in the original scope, now parked pending a human-supplied accuracy benchmark — see `TODOS.md`).
 
@@ -39,3 +44,11 @@ cd src-tauri && cargo tauri dev
 See [`docs/tutorial-getting-started.md`](docs/tutorial-getting-started.md) for the full walkthrough, including granting permissions and your first dictation.
 
 Tests: `cd src-tauri && cargo test` (78 fast unit tests). Slower real-inference integration tests are `#[ignore]`d by default — see [How to run the integration tests](docs/howto-run-integration-tests.md).
+
+## Contributing
+
+Outside contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the hard constraints, dev setup, and PR checklist. Please open an issue before starting non-trivial work. Security issues: see [`SECURITY.md`](SECURITY.md), not a public issue.
+
+## License
+
+[MIT](LICENSE)
