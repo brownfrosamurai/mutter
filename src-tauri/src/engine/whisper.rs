@@ -100,6 +100,97 @@ fn ensure_model_downloaded(tier: ModelTier) -> Result<PathBuf, EngineError> {
     Ok(path)
 }
 
+/// Windowed-RMS silence threshold used by `trim_silence` below. Chosen as a
+/// conservative floor for typical quiet-room mic noise (measured silence
+/// tends to sit under ~0.003 RMS on 16-bit-equivalent float32 samples,
+/// ordinary speech well above 0.02) — not derived from a real-world
+/// recording corpus (this environment has no mic), so treat as a tunable
+/// heuristic if real dogfooding ever shows it clipping quiet speech onsets.
+const SILENCE_RMS_THRESHOLD: f32 = 0.006;
+/// 10ms at the 16kHz rate `mic.rs` always resamples to before calling this
+/// engine (`capture::mic::TARGET_SAMPLE_RATE`).
+const SILENCE_WINDOW_SAMPLES: usize = 160;
+/// 100ms of padding kept on each side of detected speech so a trim can never
+/// clip a real word's onset/offset.
+const SILENCE_PADDING_SAMPLES: usize = 1600;
+
+/// Trims contiguous near-silence from both ends of `audio` before it's ever
+/// handed to whisper.cpp. Two independent wins from one cheap O(n) pass over
+/// data already in memory: (1) speed — the encoder's cost scales with input
+/// length, and a toggle-hotkey dictation flow (press, pause, speak, pause,
+/// press again) routinely has real dead air at both ends; (2) correctness —
+/// leading/trailing silence is exactly the input shape that provokes
+/// Whisper's own documented "[BLANK_AUDIO]"/"[MUSIC]"-style non-speech
+/// hallucinations (see `strip_non_speech_annotations` below), so trimming it
+/// away removes many of them before inference ever runs, not just after.
+///
+/// Returns `None` if the whole clip stays under threshold — nothing to
+/// transcribe at all, letting the caller skip inference entirely.
+fn trim_silence(audio: &[f32]) -> Option<&[f32]> {
+    if audio.is_empty() {
+        return None;
+    }
+
+    let loud_window = |w: &[f32]| -> bool {
+        let rms = (w.iter().map(|s| s * s).sum::<f32>() / w.len() as f32).sqrt();
+        rms >= SILENCE_RMS_THRESHOLD
+    };
+
+    let windows: Vec<bool> = audio
+        .chunks(SILENCE_WINDOW_SAMPLES)
+        .map(loud_window)
+        .collect();
+    let first_loud = windows.iter().position(|&loud| loud)?;
+    let last_loud = windows.iter().rposition(|&loud| loud)?;
+
+    let start = (first_loud * SILENCE_WINDOW_SAMPLES).saturating_sub(SILENCE_PADDING_SAMPLES);
+    let end = ((last_loud + 1) * SILENCE_WINDOW_SAMPLES + SILENCE_PADDING_SAMPLES).min(audio.len());
+    Some(&audio[start..end])
+}
+
+/// Defensive backstop for the same non-speech-tag hallucination class
+/// `trim_silence` and `set_suppress_non_speech_tokens` already fight
+/// upstream: strips any residual `[...]` span (real dictated speech never
+/// legitimately produces literal brackets — there's no spoken-formatting
+/// phrase for them, unlike "comma"/"period") and cleans up the punctuation
+/// artifact a removed tag can leave behind, e.g. "Go ahead. [MUSIC]."
+/// (whisper's own real output, from history) -> "Go ahead.", not
+/// "Go ahead. .".
+fn strip_non_speech_annotations(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            for c2 in chars.by_ref() {
+                if c2 == ']' {
+                    break;
+                }
+            }
+            // Collapse to exactly one removed separator, never both: a
+            // tag flanked by spaces on both sides ("word [TAG] word")
+            // must leave a single space behind, not zero.
+            let consumed_following_space = chars.peek() == Some(&' ');
+            if consumed_following_space {
+                chars.next();
+            }
+            if !consumed_following_space && out.ends_with(' ') {
+                out.pop();
+            }
+        } else {
+            out.push(c);
+        }
+    }
+
+    let mut deduped = String::with_capacity(out.len());
+    for c in out.chars() {
+        if matches!(c, '.' | '!' | '?' | ',') && deduped.ends_with(c) {
+            continue;
+        }
+        deduped.push(c);
+    }
+    deduped
+}
+
 pub struct WhisperEngine {
     tier: ModelTier,
     context: OnceCell<Arc<WhisperContext>>,
@@ -171,6 +262,19 @@ impl TranscriptionEngine for WhisperEngine {
 
         tokio::task::spawn_blocking(move || -> Result<Transcript, EngineError> {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let Some(trimmed) = trim_silence(&audio) else {
+                    // Whole segment is below the silence threshold — skip
+                    // inference entirely rather than pay a full encoder pass
+                    // for known-silent audio (see trim_silence's doc
+                    // comment; session.rs already treats an empty
+                    // Transcript::text as a no-op, so this is a pure
+                    // speed/correctness win with no new downstream case).
+                    return Ok(Transcript {
+                        text: String::new(),
+                        language: "unknown".to_string(),
+                    });
+                };
+
                 let mut state = context
                     .create_state()
                     .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
@@ -204,9 +308,18 @@ impl TranscriptionEngine for WhisperEngine {
                 params.set_print_progress(false);
                 params.set_print_realtime(false);
                 params.set_print_timestamps(false);
+                // The real fix for whisper's "[BLANK_AUDIO]"/"[MUSIC]"-style
+                // non-speech hallucinations: whisper.cpp maintains a curated
+                // list of non-speech symbol tokens (incl. "[", "]", "(",
+                // ")", music notes) and, when this is on, suppresses their
+                // logits at decode time so the model can never generate them
+                // — not a post-hoc string filter, the model structurally
+                // can't open a bracket. Off by default in both whisper.cpp
+                // and whisper-rs; never previously set here.
+                params.set_suppress_non_speech_tokens(true);
 
                 state
-                    .full(params, &audio)
+                    .full(params, trimmed)
                     .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
 
                 let n_segments = state
@@ -228,7 +341,7 @@ impl TranscriptionEngine for WhisperEngine {
                     .to_string();
 
                 Ok(Transcript {
-                    text: text.trim().to_string(),
+                    text: strip_non_speech_annotations(text.trim()),
                     language,
                 })
             }))
@@ -248,6 +361,91 @@ mod tests {
     #[test]
     fn model_tiers_have_distinct_filenames() {
         assert_ne!(ModelTier::Small.filename(), ModelTier::Medium.filename());
+    }
+
+    // --- strip_non_speech_annotations ---
+
+    #[test]
+    fn strips_real_hallucinated_tags_from_history() {
+        // Verbatim examples pulled from real Mutter transcripts.
+        assert_eq!(
+            strip_non_speech_annotations("Let us develop topic 5. [BLANK_AUDIO]."),
+            "Let us develop topic 5."
+        );
+        assert_eq!(
+            strip_non_speech_annotations("Go ahead. [MUSIC]."),
+            "Go ahead."
+        );
+        assert_eq!(
+            strip_non_speech_annotations(
+                "Ensure the default height of the dashboard covers the entire matrix panel. [MUSIC]."
+            ),
+            "Ensure the default height of the dashboard covers the entire matrix panel."
+        );
+    }
+
+    #[test]
+    fn strips_a_leading_tag_without_leaving_a_leading_space() {
+        assert_eq!(
+            strip_non_speech_annotations("[MUSIC] hello world"),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn strips_a_mid_sentence_tag_without_a_double_space() {
+        assert_eq!(
+            strip_non_speech_annotations("hello [NOISE] world"),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn a_pure_tag_transcript_becomes_empty() {
+        assert_eq!(strip_non_speech_annotations("[BLANK_AUDIO]"), "");
+    }
+
+    #[test]
+    fn text_with_no_tags_is_unchanged() {
+        assert_eq!(
+            strip_non_speech_annotations("just a normal sentence."),
+            "just a normal sentence."
+        );
+    }
+
+    // --- trim_silence ---
+
+    #[test]
+    fn a_fully_silent_clip_trims_to_none() {
+        let audio = vec![0.0_f32; SILENCE_WINDOW_SAMPLES * 10];
+        assert!(trim_silence(&audio).is_none());
+    }
+
+    #[test]
+    fn an_empty_clip_trims_to_none() {
+        assert!(trim_silence(&[]).is_none());
+    }
+
+    #[test]
+    fn loud_audio_padded_by_silence_trims_the_silence_but_keeps_padding() {
+        let silence = vec![0.0_f32; SILENCE_WINDOW_SAMPLES * 20];
+        let loud = vec![0.5_f32; SILENCE_WINDOW_SAMPLES * 5];
+        let mut audio = silence.clone();
+        audio.extend_from_slice(&loud);
+        audio.extend_from_slice(&silence);
+
+        let trimmed = trim_silence(&audio).expect("clip has loud audio");
+        // Shorter than the original (real trimming happened)...
+        assert!(trimmed.len() < audio.len());
+        // ...but still covers every loud sample plus some padding margin.
+        assert!(trimmed.len() >= loud.len());
+    }
+
+    #[test]
+    fn all_loud_audio_is_returned_unchanged() {
+        let audio = vec![0.5_f32; SILENCE_WINDOW_SAMPLES * 5];
+        let trimmed = trim_silence(&audio).expect("clip is loud");
+        assert_eq!(trimmed, &audio[..]);
     }
 
     #[test]
