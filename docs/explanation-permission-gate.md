@@ -27,9 +27,17 @@ Each permission family's underlying OS query is genuinely different — AVFounda
 
 `PermissionState::Unavailable` covers device-level problems distinct from a user's deliberate denial: no microphone present, or (for Accessibility) `Restricted` status from parental controls or MDM policy — situations a "click Grant" UI can't actually fix, unlike a plain `Denied`, which System Settings can resolve. `needs_recovery_ui()` treats both the same way today (both surface a recovery path), but keeping them as distinct states leaves room for the UI to eventually say something more specific than "denied" when the real answer is "this Mac has no microphone."
 
-## Why mic gets an active `request()` and the other two don't
+## Why all three gates now have an active `request()` (updated 2026-09-01)
 
-Mic is the only one of the three with an OS-level "show me the permission prompt" API (`AVCaptureDevice.requestAccessForMediaType:completionHandler:`, wrapped by the `permissions_shim.m` native shim). Accessibility and Screen Recording have no equivalent active-request call on macOS — the only way to grant either is a deep link to System Settings' matching pane (`open_permission_settings` in `lib.rs`), which the user has to act on manually. `PermissionGate<Mic>::request()` exists as a genuinely separate capability from `refresh()` for exactly this reason; the other two gates only ever `refresh()`.
+All three permission families have a real, native active-request API on macOS, and all three `PermissionGate` instantiations now implement `request()`, not just `refresh()`:
+
+- **Mic** — `AVCaptureDevice.requestAccessForMediaType:completionHandler:`, wrapped by the `permissions_shim.m` native shim.
+- **Accessibility** — `AXIsProcessTrustedWithOptions` with `kAXTrustedCheckOptionPrompt`, which shows the real "would like to control this computer" trust alert.
+- **Screen Recording** — `CGRequestScreenCaptureAccess`.
+
+Earlier, only mic had an active-request path — Accessibility and Screen Recording's `request()` didn't exist, and the only way to grant either was a deep link to System Settings' matching pane (`open_permission_settings` in `lib.rs`). That deep link (`openPermissionSettings`) still exists and is still the *only* way in for a permission whose native re-prompt has stopped reappearing (real TCC behavior after repeat denials, most commonly seen with Accessibility) — but it's now a fallback surfaced once a row reads `denied`, not the primary Grant action.
+
+All three native calls need real main-thread affinity — TCC's UI-presentation path requires it — so `request()` dispatches through a shared `run_on_main_thread` helper (`dispatch2`'s `exec_sync`) rather than each gate rolling its own dispatch. Every native FFI call here (including `run_on_main_thread`'s own dispatched closure) is wrapped in `catch_native_panic`, per this project's panic-safety constraint that a native FFI panic must never take down the whole app — `dispatch2`'s `exec_sync` crosses a non-unwind-safe `extern "C"` boundary, so the catch has to happen *inside* the dispatched closure and the panic gets resumed on the calling thread afterward, not caught only at the call site (a real bug this project hit and fixed while building this).
 
 ## Related
 

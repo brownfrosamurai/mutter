@@ -38,4 +38,4 @@ cd src-tauri && cargo tauri dev
 
 See [`docs/tutorial-getting-started.md`](docs/tutorial-getting-started.md) for the full walkthrough, including granting permissions and your first dictation.
 
-Tests: `cd src-tauri && cargo test` (75 fast unit tests). Slower real-inference integration tests are `#[ignore]`d by default — see [How to run the integration tests](docs/howto-run-integration-tests.md).
+Tests: `cd src-tauri && cargo test` (78 fast unit tests). Slower real-inference integration tests are `#[ignore]`d by default — see [How to run the integration tests](docs/howto-run-integration-tests.md).

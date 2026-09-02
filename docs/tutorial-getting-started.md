@@ -33,7 +33,9 @@ Click it. You'll see a menu with **Open Dashboard**, **Start Listening**, and **
 
 ## Step 3: Grant permissions
 
-Open **Settings** in the dashboard (the gear icon in the sidebar). You'll see three permission rows: Microphone, Accessibility, Screen Recording. Click **Grant** on Microphone — a real macOS system prompt appears; allow it. For Accessibility, the Grant button deep-links to System Settings' Privacy & Security → Accessibility pane; add Mutter there and enable it. Screen Recording only matters if you plan to use system-audio capture (dictating from a meeting or video) — you can skip it for now.
+Open **Settings** in the dashboard (the gear icon in the sidebar). You'll see three permission rows: Microphone, Accessibility, Screen Recording. Click **Grant** on any of them — each now triggers a real macOS system prompt directly (mic's own `AVCaptureDevice` prompt, Accessibility's "would like to control this computer" trust alert, Screen Recording's capture-access prompt); allow it. If a row shows Denied and the native prompt stops reappearing (real macOS TCC behavior for Accessibility/Screen Recording after repeat denials), an "Open System Settings" link appears next to it as a fallback — use that to add Mutter under Privacy & Security manually. Screen Recording only matters if you plan to use system-audio capture (dictating from a meeting or video) — you can skip it for now.
+
+The first time you launch a fresh build, an **Onboarding** window appears before the dashboard and walks through this same permission sequence automatically — it fires all three requests in order the moment you reach its last step, so you may already see the native prompts before ever opening Settings. Settings' Permissions section (this step) is what you'd use to grant anything skipped or denied during that first run.
 
 Accessibility is what lets Mutter type text directly into whatever app has focus; without it, transcripts still work but land on your clipboard instead of being typed automatically.
 
