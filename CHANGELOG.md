@@ -2,6 +2,11 @@
 
 All notable changes to Mutter are documented in this file.
 
+## [0.3.1] - 2026-09-03
+
+### Added
+- Settings' Permissions section now shows a tooltip on each Grant button explaining that you may need to re-grant permissions after updating Mutter to a new version, since each release is signed independently.
+
 ## [0.3.0] - 2026-09-02
 
 ### Added
