@@ -62,25 +62,33 @@ encouraged where one exists (`feature/42-fts-search`).
 
 **Merge strategy** — GitHub doesn't enforce this per-branch, so it's a
 convention, not a technical gate: **squash merge** `feature/`/`fix/`/`chore/`
-PRs into `develop` (one clean commit per change). Use a real **merge commit**
-(not squash) for **any PR into `main`** — `release/`/`hotfix/` branches and
-the trivial-version-bump `develop` → `main` direct merge alike — so the
-release branch's own history is preserved on `main` for later reference.
+PRs into `develop` (one clean commit per change). Prefer a real **merge
+commit** (not squash) for **any PR into `main`** — `release/`/`hotfix/`
+branches and the trivial-version-bump `develop` → `main` direct merge alike —
+so the release branch's own history is preserved on `main` for later
+reference. This is a preference, not a requirement (see below for why it's
+no longer enforced).
 
-This isn't just a history-tidiness preference: `main`'s branch protection
-requires the PR branch be up to date with `main` before merging
-(`required_status_checks.strict`). A **squash** merge into `main` creates a
-brand-new commit that only exists on `main` — it never becomes an ancestor
-of `develop` — so the *next* `develop` → `main` PR gets blocked as
-"out of date" even though the content already matches. A real merge commit
-keeps `develop`'s tip as a direct parent of `main`'s new tip, which avoids
-this. If it happens anyway, fix it by merging `main`'s tip back into
-`develop` (verify zero content diff first with
-`git merge --no-commit --no-ff origin/main`) — but note `develop`'s own
-`required_linear_history` protection hides "create a merge commit" in
-GitHub's PR UI, so that specific sync has to be a direct
-`git push origin <local-branch>:develop` of a manually-built merge commit,
-not a PR merge button.
+**History note, 2026-09-02:** `main`'s branch protection originally required
+the PR branch be up to date with `main` before merging
+(`required_status_checks.strict`), on the theory that a real merge commit
+into `main` would keep `develop`'s tip as a direct parent of `main`'s new
+tip and avoid ancestry drift. In practice this didn't hold: GitHub's merge
+API repeatedly collapsed a *zero-content-diff* `develop` → `main` merge into
+a single-parent commit regardless of the requested method — squash, the web
+UI's "Create a merge commit" button, and even `gh pr merge --merge --admin`
+all produced the same single-parent result when there was nothing new to
+merge. Chasing this cost several rounds of manual `git push
+origin <local-branch>:develop` syncs (see `TODOS.md`'s "branch-sync process
+gap" entry for the full trail) before landing on the actual fix: **both
+`main`'s `required_status_checks.strict` and `develop`'s
+`required_linear_history` are now disabled.** A `develop` → `main` PR only
+needs passing CI + review now, not a literal ancestor relationship — so the
+occasional single-parent artifact GitHub produces is cosmetic (shows as a
+small "ahead/behind" mismatch in GitHub's UI) rather than a hard block. If
+you want to tidy that up, merging `main`'s tip back into `develop` (verify
+zero content diff first with `git merge --no-commit --no-ff origin/main`,
+then a real `git push`) still works and is optional, not required.
 
 **`release/`/`hotfix/` branches merge into two targets** (`main` and
 `develop`) — don't let GitHub's auto-delete-on-merge remove the branch after

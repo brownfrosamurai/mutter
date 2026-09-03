@@ -21,7 +21,7 @@ Nothing crosses the boundary except through Tauri's IPC (`invoke`) and events (`
 | `capture/mic.rs` | Mic capture via `cpal` — its own OS thread, 120s ring buffer, downmix + resample to 16kHz mono |
 | `capture/system_audio.rs` | System-audio (loopback) capture via a ScreenCaptureKit Objective-C shim, 300s buffer |
 | `engine/mod.rs` | The `TranscriptionEngine` and `TextProcessor` traits, `EngineError`, `Transcript` |
-| `engine/whisper.rs` | `WhisperEngine` — whisper.cpp via `whisper-rs`, lazy-loaded, Metal-accelerated |
+| `engine/whisper.rs` | `WhisperEngine` — whisper.cpp via `whisper-rs`, lazy-loaded, Metal-accelerated; trims leading/trailing silence and suppresses non-speech-tag hallucinations before/during inference (see [`explanation-non-speech-hallucination-fix.md`](explanation-non-speech-hallucination-fix.md)) |
 | `engine/apple_speech.rs` | `AppleSpeechEngine` — a stub, not built (see [ADR: why not `AppleSpeechEngine`](#why-applespeechengine-was-never-built)) |
 | `engine/grammar.rs` | `RuleBasedCleanup` — Option A, five independently-toggleable rule-based text steps |
 | `engine/llm_cleanup.rs` | `LlmCleanup` — Option B, a local Qwen2.5-0.5B GGUF model via `candle` |
@@ -104,4 +104,5 @@ The `TranscriptionEngine` trait was written to support two backends (`WhisperEng
 - [`explanation-glass-shell.md`](explanation-glass-shell.md) — the native window-material mechanism
 - [`explanation-permission-gate.md`](explanation-permission-gate.md) — why one generic `PermissionGate<T>`
 - [`explanation-grammar-pipeline.md`](explanation-grammar-pipeline.md) — Option A/B and why cleanup ended up always-on
+- [`explanation-non-speech-hallucination-fix.md`](explanation-non-speech-hallucination-fix.md) — why transcripts don't say "[BLANK_AUDIO]" anymore
 - [`tutorial-getting-started.md`](tutorial-getting-started.md) — build and run this from scratch
