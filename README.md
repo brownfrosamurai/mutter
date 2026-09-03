@@ -32,9 +32,9 @@ You can also grant everything directly through macOS itself, without opening Mut
 ## Documentation
 
 - **Tutorial:** [Getting started](docs/tutorial-getting-started.md)
-- **How-to guides:** [Add a Settings toggle](docs/howto-add-a-settings-toggle.md) · [Add or change a Tauri command](docs/howto-add-a-tauri-command.md) · [Run the integration tests](docs/howto-run-integration-tests.md) · [Build and sign a release](docs/howto-build-and-sign-a-release.md)
+- **How-to guides:** [Add a Settings toggle](docs/howto-add-a-settings-toggle.md) · [Add or change a Tauri command](docs/howto-add-a-tauri-command.md) · [Run the integration tests](docs/howto-run-integration-tests.md) · [Cut a release](docs/howto-cut-a-release.md) · [Build and sign a release](docs/howto-build-and-sign-a-release.md)
 - **Reference:** [Architecture](docs/reference-architecture.md) · [Tauri commands (IPC)](docs/reference-commands.md) · [Settings schema](docs/reference-settings.md) · [History database schema](docs/reference-history-schema.md)
-- **Explanation:** [Session orchestration](docs/explanation-session-orchestration.md) · [Native glass-shell windows](docs/explanation-glass-shell.md) · [Permission gates](docs/explanation-permission-gate.md) · [Grammar cleanup pipeline](docs/explanation-grammar-pipeline.md)
+- **Explanation:** [Session orchestration](docs/explanation-session-orchestration.md) · [Native glass-shell windows](docs/explanation-glass-shell.md) · [Permission gates](docs/explanation-permission-gate.md) · [Grammar cleanup pipeline](docs/explanation-grammar-pipeline.md) · [Why transcripts don't say "[BLANK_AUDIO]" anymore](docs/explanation-non-speech-hallucination-fix.md)
 - [`docs/mutter-project-plan.md`](docs/mutter-project-plan.md) — the original plan of record: architecture, phased roadmap, test strategy, validation gate
 - [`docs/mutter-idea-dump.md`](docs/mutter-idea-dump.md) — original freeform spec
 - [`DESIGN.md`](DESIGN.md) — visual design tokens for the pill HUD and dashboard

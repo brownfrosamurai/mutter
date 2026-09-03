@@ -1,6 +1,6 @@
 # How to build and sign a release
 
-Two separate things share the word "build" here, and they're not interchangeable: fast local iteration, and the real tagged release CI publishes. This guide covers both, plus the one-time signing setup each depends on.
+Two separate things share the word "build" here, and they're not interchangeable: fast local iteration, and the real tagged release CI publishes. This guide covers both, plus the one-time signing setup each depends on. For the branch/PR process that gets `develop`'s content onto `main` before you tag, see [`howto-cut-a-release.md`](howto-cut-a-release.md).
 
 ## Prerequisites
 
@@ -38,14 +38,16 @@ This uses `tauri.conf.json`'s configured `signingIdentity` ("Mutter Dev Signing"
 `.github/workflows/release.yml` builds and publishes a GitHub Release automatically whenever a `v*` tag is pushed:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
+
+(See [`howto-cut-a-release.md`](howto-cut-a-release.md) for the full process leading up to this — getting `develop` onto `main` first, and what to do if the PR reports being out of date.)
 
 This runs on a GitHub-hosted `macos-latest` runner via `tauri-apps/tauri-action`, which:
 
 1. Builds the app and bundles it (`.app` + `.dmg`).
-2. Code-signs the bundle **ad-hoc** (`--config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'`) — the local "Mutter Dev Signing" certificate only exists in the maintainer's own keychain, not on a CI runner, and this project has no paid Apple Developer notarization (a deliberate "zero paid resources for v1" constraint — see `CLAUDE.md`).
+2. Code-signs the bundle **ad-hoc** (`--config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'`) — the local "Mutter Dev Signing" certificate only exists in the maintainer's own keychain, not on a CI runner, and this project has no paid Apple Developer notarization (a deliberate "zero paid resources for v1" constraint — see `CLAUDE.md`). One real consequence worth knowing: because every release build's ad-hoc signature has no stable Team ID (a different `CDHash` per build), macOS's TCC doesn't carry mic/Accessibility/Screen Recording grants forward from one release to the next — a user updating to a new version has to re-grant permissions, even though the bundle identifier never changes. Not a bug, a direct consequence of this signing setup; see `TODOS.md`'s "OS permissions reset on every new install/update" entry for the full mechanism.
 3. **Separately**, Ed25519-signs the update payload itself using the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret, and generates `latest.json` — the manifest the app's own in-app updater (Settings → Software update → Check for Updates) polls for. This signature is independent of the OS code signature, and is what actually lets the updater verify a downloaded update's authenticity regardless of ad-hoc signing.
 4. Creates a draft GitHub Release named `Mutter <tag>` with the `.dmg` and `latest.json` attached.
 
@@ -81,4 +83,6 @@ For a tagged release: check the GitHub Actions run for the `release` workflow su
 
 ## Related
 
+- [`howto-cut-a-release.md`](howto-cut-a-release.md) — the branch/PR process before you get here
 - [`reference-architecture.md`](reference-architecture.md)
+- `TODOS.md`'s "OS permissions reset on every new install/update" entry
