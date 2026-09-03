@@ -129,6 +129,14 @@ Not acted on now — Screen Recording rarely shows any interactive dialog at all
 
 Verified after both changes: `main` and `develop` content-identical (`git diff` empty), `main` 0 commits ahead of `develop`. Took 5 rounds of manual sync (PRs #24/#26/#27/#28/#29/#30/#31/#32 and the `chore/sync-main-into-develop-{2,3,4,5}` branches) to reach a stable state — see this repo's PR history around 2026-09-02 for the full trail if this ever needs re-diagnosing.
 
+## Known limitation, not a bug: OS permissions reset on every new install/update
+
+**Root-caused 2026-09-02 via `/investigate`, not fixed — this is a direct, unavoidable consequence of an already-made architecture decision, not something a code change can resolve.** Reinstalling Mutter from a freshly downloaded release (e.g. after `tccutil reset` + reinstalling the `v0.3.0` `.dmg`) requires re-granting Microphone/Accessibility/Screen Recording from scratch, even though the app's bundle identifier (`com.femimeduna.mutter`) never changes.
+
+**Mechanism, confirmed via `codesign -dvvv` on the real installed `.app`:** `Signature=adhoc`, `TeamIdentifier=not set`. `release.yml` deliberately overrides `tauri.conf.json`'s `signingIdentity` (`"Mutter Dev Signing"`, a self-signed cert that only exists in the maintainer's local keychain) to ad-hoc (`"-"`) for every CI-built release — the local cert isn't available on GitHub's runner, and wouldn't help anyway since it's untrusted on anyone else's machine. Ad-hoc signing has no stable Team ID; instead each build gets its own `CDHash` derived from that specific compiled binary. macOS's TCC (the system governing these three permissions) keys grants to an app's code identity — with a real paid Apple Developer ID, that's the stable Team ID, which survives rebuilds/updates so permissions persist across versions. Without one, TCC falls back to the ad-hoc signature itself, and every new build's different `CDHash` looks like a different app, so grants don't carry forward.
+
+**Not fixed, and shouldn't be without a real decision:** the only actual fix is enrolling in the paid Apple Developer Program ($99/yr) and switching to real Developer ID signing + notarization — which CLAUDE.md already documents as a deliberate, deferred tradeoff (`2026-09-02`, `/plan-ceo-review`: "stay ad-hoc-signed, zero paid resources — revisit Apple Developer Program / notarization only once real non-developer-install demand shows up"). This entry exists so a future GitHub issue reporting "permissions keep resetting after I update" isn't rediscovered as a mystery — it's expected behavior under the current signing setup, not a regression.
+
 ## DONE — Grammar cleanup Option B (local-LLM cleanup)
 
 Built 2026-08-30 (`engine/llm_cleanup.rs`, `engine/pipeline.rs`), ahead of

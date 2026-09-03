@@ -5,7 +5,7 @@
 
 Local-first, multi-language speech-to-text dictation for macOS. Toggle a hotkey, speak, toggle again — text lands at your cursor. A second mode captures system audio (meetings, videos), Granola-style. Everything runs on-device: no subscriptions, no cloud, no network calls after the model downloads once.
 
-**No signed release yet.** There's no notarized, double-click-install `.dmg` — build from source (below). GitHub Releases produced by `.github/workflows/release.yml` are ad-hoc signed, which means macOS Gatekeeper will complain; right-click → Open past the warning, or just build it yourself.
+**No notarized release yet.** GitHub Releases (below) are ad-hoc signed, not notarized — macOS Gatekeeper will complain on first launch; right-click → Open past the warning, or build from source instead.
 
 Built for dictating to AI coding agents and general dictation. v1 ships English; Whisper's multilingual model auto-detects and transcribes other languages too (Yoruba, Spanish, Italian, French, Arabic were in the original scope, now parked pending a human-supplied accuracy benchmark — see `TODOS.md`).
 
@@ -15,7 +15,19 @@ Working end-to-end: hotkey → capture → transcribe (Whisper, on-device) → g
 
 ## Get started
 
-**[`docs/tutorial-getting-started.md`](docs/tutorial-getting-started.md)** — clone, build, run, dictate something. Start here.
+**Download a release:** grab the `.dmg` from [Releases](https://github.com/brownfrosamurai/mutter/releases/latest), open it, and drag Mutter to Applications. Since it's ad-hoc signed rather than notarized, macOS will refuse a plain double-click the first time — **right-click Mutter.app → Open**, then confirm in the dialog that appears.
+
+**Or build from source:** **[`docs/tutorial-getting-started.md`](docs/tutorial-getting-started.md)** — clone, build, run, dictate something.
+
+### Granting permissions after install
+
+Mutter needs Microphone, Accessibility, and Screen Recording access to work. On first launch, an **Onboarding** window walks through requesting all three automatically — just click through it and allow each system prompt.
+
+If a prompt doesn't appear, or you need to grant something later, do it manually: click Mutter's icon in the menu bar → **Open Dashboard** → the gear icon (**Settings**) → the **Permissions** section, and click **Grant** next to each row (or **Open System Settings** if the native prompt stops reappearing, which is normal macOS behavior after a repeat denial). Screen Recording is only needed for system-audio capture (dictating from a meeting or video) — you can skip it if you're only using mic dictation.
+
+You can also grant everything directly through macOS itself, without opening Mutter's own Settings: **System Settings → Privacy & Security**, then enable Mutter under each of **Microphone**, **Accessibility**, and **Screen Recording**.
+
+**If you've updated to a newer version and dictation stops working** (mic doesn't respond, text doesn't get typed in), re-grant permissions using either method above — this is expected, not a bug. Each release build is signed ad-hoc rather than with a stable Apple Developer certificate, so macOS treats every new build as a different app and doesn't carry permission grants forward across updates (see `TODOS.md` for the full mechanism). Onboarding won't automatically reappear to prompt you again since it only shows up once per install, so the manual Settings path above is the one to use after updating.
 
 ## Documentation
 
