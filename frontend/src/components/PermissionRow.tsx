@@ -155,6 +155,7 @@ export function PermissionRow({ kind, status, onGrantAttempted, mode = "action" 
             type="button"
             onClick={() => void handleGrant()}
             disabled={pending}
+            title="After updating Mutter to a new version, you may need to click Grant again for each permission — every release is signed independently, so macOS doesn't carry earlier grants forward automatically."
             className="shrink-0 rounded-pill px-[9px] py-[3px] text-[9px] font-semibold text-white transition-opacity duration-fast hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
             style={{ backgroundColor: "var(--surface-filled)" }}
           >
