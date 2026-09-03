@@ -3024,7 +3024,7 @@ dependencies = [
 
 [[package]]
 name = "mutter"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "accessibility-sys",
  "async-trait",

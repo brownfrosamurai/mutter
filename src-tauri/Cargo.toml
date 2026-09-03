@@ -1,6 +1,6 @@
 [package]
 name = "mutter"
-version = "0.3.0"
+version = "0.3.1"
 description = "Local-first, multi-language speech-to-text dictation for macOS"
 license = "MIT"
 repository = "https://github.com/brownfrosamurai/mutter"
